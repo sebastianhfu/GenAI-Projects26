@@ -7,11 +7,14 @@ videos in the style of a PowerPoint presentation with a presenter. The idea is
 that a user enters a topic and the system produces a complete video in which an
 avatar-based presenter explains slide contents.
 
-The presenter avatar is planned to be modelled on **Prof. Dr. Uwe Hahne**, whose
-research and teaching focus lies in media informatics, computer graphics,
-human–computer interaction, and related fields at Hochschule Osnabrück.
-Consequently, the demo topics suggested below are drawn from these subject
-areas.
+The presenter avatar is planned to be modelled on **Prof. Dr. Uwe Hahne**, Dean
+of Studies (Studiendekan) for Innovation Engineering (M.Sc.), Medieninformatik
+(M.Sc.), and Sales & Service Engineering (MBA) at **Hochschule Furtwangen
+University (HFU)**, Faculty I: Computer Science & Applications. His research
+focuses on 3D computer vision, depth imaging, augmented and mixed reality,
+human–computer interaction, and Neural Radiance Fields (NeRF) for industrial
+applications. Consequently, the demo topics suggested below are drawn directly
+from these subject areas.
 
 > **Note:** This page describes the planning state only. No implementation, no
 > training, and no generation has been performed.
@@ -27,7 +30,7 @@ the orchestration agent and coordinates multiple external services.
 
 ```
 ┌─────────────────┐
-│     User        │  Enters a topic (e.g. "How does 3D rendering work?")
+│     User        │  Enters a topic (e.g. "How does NeRF reconstruct 3D scenes?")
 └────────┬────────┘
          ▼
 ┌─────────────────┐
@@ -148,51 +151,53 @@ The following points must be clarified before implementation can begin.
 For later prototyping, topics should be short enough for a demo video (approx.
 1–3 minutes) but technically substantial enough to demonstrate the usefulness
 of the system. The topics below are aligned with the research and teaching
-areas of **Prof. Dr. Uwe Hahne** — primarily **media informatics, computer
-graphics, human–computer interaction, web/mobile technologies, and AI
-fundamentals**.
+areas of **Prof. Dr. Uwe Hahne** at Hochschule Furtwangen University —
+primarily **3D computer vision, depth imaging, augmented/mixed reality,
+human–computer interaction, Neural Radiance Fields (NeRF), and media
+informatics**.
 
 ### Topic Categories
 
+- Neural Radiance Fields and 3D Reconstruction
+- Depth Imaging and 3D Computer Vision
+- Augmented, Mixed, and Virtual Reality
+- Human–Computer Interaction and Multi-Touch
 - Computer Graphics and Visualisation
-- Human–Computer Interaction (HCI)
-- Virtual and Augmented Reality
-- Web and Mobile Technologies
-- Artificial Intelligence and Machine Learning Fundamentals
-- Game Development and Interactive Media
+- Media Informatics and Industrial Applications
 
 ### Concrete Topic Suggestions
 
-| No. | Topic | Why It Fits Prof. Hahne's Areas |
-|-----|-------|--------------------------------|
-| 1 | **How does 3D rendering work?** | Core computer graphics topic |
-| 2 | **What is ray tracing?** | Classic graphics rendering technique |
-| 3 | **How does a shader program work?** | GPU graphics pipeline |
-| 4 | **What is a polygon mesh?** | 3D modelling fundamentals |
-| 5 | **How does texture mapping work?** | Graphics texturing |
-| 6 | **What is the rendering pipeline?** | Core graphics concept |
-| 7 | **How does augmented reality (AR) work?** | AR/VR fundamentals |
-| 8 | **What is the difference between VR and AR?** | Mixed reality concepts |
-| 9 | **How does computer animation work?** | Animation principles |
-| 10 | **What are skeletal animation and rigging?** | Character animation basics |
-| 11 | **What is human–computer interaction (HCI)?** | HCI fundamentals |
-| 12 | **How does a touch interface work?** | Interaction design |
-| 13 | **What is usability engineering?** | HCI design methodology |
-| 14 | **How does a search engine work?** | Web technology / information retrieval |
-| 15 | **What is a REST API?** | Web development fundamentals |
-| 16 | **How does responsive web design work?** | Modern web technology |
-| 17 | **What is a neural network?** | AI fundamentals |
-| 18 | **How does image classification work?** | Computer vision basics |
-| 19 | **What is the difference between supervised and unsupervised learning?** | ML core concept |
-| 20 | **How does a recommendation system work?** | Practical AI application |
-| 21 | **What is a game engine?** | Game development fundamentals |
-| 22 | **How does real-time physics simulation work in games?** | Interactive media |
-| 23 | **What is procedural content generation?** | Game design + AI overlap |
-| 24 | **How does motion capture work?** | Animation technology |
-| 25 | **What is data visualisation?** | Graphics + HCI overlap |
+| No. | Topic | Why It Fits Prof. Hahne's Research |
+|-----|-------|-----------------------------------|
+| 1 | **What are Neural Radiance Fields (NeRF)?** | Direct match — 2024 paper on NeRFs for the Industrial Metaverse |
+| 2 | **How does NeRF reconstruct a 3D scene from photos?** | Core NeRF technology |
+| 3 | **What is the difference between NeRF and traditional 3D scanning?** | NeRF vs. conventional depth imaging |
+| 4 | **How does a Time-of-Flight (ToF) camera measure depth?** | Direct match — PhD thesis and multiple papers on depth imaging |
+| 5 | **How does stereo vision estimate depth?** | 2008/2009 papers on combining ToF and stereo |
+| 6 | **What is depth image fusion?** | 2011 paper: "Exposure Fusion for Time-of-Flight Imaging" |
+| 7 | **How does the HoloLens display augmented reality?** | Direct match — 2017 paper on HoloLens and 3D sensors |
+| 8 | **What is the difference between AR, MR, and VR?** | AR/MR research lineage |
+| 9 | **How do multi-touch screens track fingers?** | Direct match — 2008 SIGGRAPH paper on FTIR touch sensing |
+| 10 | **How does perspective projection affect 3D interaction?** | Direct match — 2012 paper on perspective projection in multi-touch 3D |
+| 11 | **What is sketch-based interaction?** | Direct match — 2009 paper on multi-touch sketch-based interaction |
+| 12 | **How does focus-plus-context interaction work?** | Direct match — 2009 paper on focus+context sketch interaction |
+| 13 | **What is the rendering pipeline in computer graphics?** | Graphics foundations |
+| 14 | **How does exposure bracketing create HDR images?** | Links to exposure fusion research |
+| 15 | **What is an industrial metaverse?** | Direct match — 2023/2024 NeRF-for-metaverse papers |
+| 16 | **How can 3D scanning digitise a factory floor?** | Industrial 3D vision application |
+| 17 | **What is a point cloud and how is it used?** | 3D vision fundamentals |
+| 18 | **How does photogrammetry create 3D models?** | Related to NeRF and depth imaging |
+| 19 | **What is inside-out tracking for VR headsets?** | Depth sensors + tracking |
+| 20 | **How does a depth sensor work under different lighting?** | Depth imaging robustness |
+| 21 | **What is simultaneous localisation and mapping (SLAM)?** | 3D vision + robotics overlap |
+| 22 | **How can AR overlays guide industrial maintenance?** | HoloLens / industrial AR application |
+| 23 | **What is tangible interaction?** | HCI extension from touch research |
+| 24 | **How does a computer recognise hand gestures?** | Vision + HCI overlap |
+| 25 | **What is spatial computing?** | Modern framing of AR/MR/VR research |
 
-> **Recommended Prototype Topics:** No. 1, 11, 15, 17, or 21 — these are
-> concise, visually supportable, and understandable for a broad audience.
+> **Recommended Prototype Topics:** No. 1, 4, 7, 9, or 15 — these are
+> concise, visually supportable, and directly grounded in Prof. Hahne's
+> published research.
 
 ---
 

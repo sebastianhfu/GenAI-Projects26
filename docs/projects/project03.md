@@ -12,7 +12,8 @@ visualised on slides and delivers a matching narration.
 - Plan the integration of external services (avatar generation, voice cloning)
 - Define interfaces and data flows between distributed components
 - Document possible architectures, phases, and open questions
-- Collect suitable demo topics aligned with Prof. Dr. Uwe Hahne's teaching areas
+- Collect suitable demo topics aligned with Prof. Dr. Uwe Hahne's research areas at
+  Hochschule Furtwangen University (HFU)
 
 ## Status
 
