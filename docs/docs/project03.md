@@ -1,228 +1,264 @@
-# Dokumentation — Projekt 3 (Educational Video Generation System)
+# Documentation — Project 3 (Educational Video Generation System)
 
-## Projektbeschreibung
+## Project Description
 
-Dieses Projekt plant ein System zur automatisierten Erstellung von didaktischen Erklärvideos im Stil einer PowerPoint-Präsentation mit Moderator. Die Idee ist, dass ein Nutzer ein Thema eingibt und das System daraus ein vollständiges Video erzeugt, in dem ein Avatar-basierter Moderator Folien-Inhalte erklärt.
+This project plans a system for the automated creation of didactic explainer
+videos in the style of a PowerPoint presentation with a presenter. The idea is
+that a user enters a topic and the system produces a complete video in which an
+avatar-based presenter explains slide contents.
 
-> **Hinweis:** Diese Seite beschreibt ausschließlich den Planungsstand. Keine Implementierung, kein Training und keine Generierung wurden durchgeführt.
+The presenter avatar is planned to be modelled on **Prof. Dr. Uwe Hahne**, whose
+research and teaching focus lies in media informatics, computer graphics,
+human–computer interaction, and related fields at Hochschule Osnabrück.
+Consequently, the demo topics suggested below are drawn from these subject
+areas.
+
+> **Note:** This page describes the planning state only. No implementation, no
+> training, and no generation has been performed.
 
 ---
 
-## Geplante Systemarchitektur
+## Planned System Architecture
 
-Die Architektur ist als verteiltes System konzipiert, bei dem Hermes als Orchestrierungsagent fungiert und mehrere externe Dienste koordiniert.
+The architecture is designed as a distributed system in which Hermes acts as
+the orchestration agent and coordinates multiple external services.
 
-### Datenfluss (geplant)
+### Data Flow (planned)
 
 ```
 ┌─────────────────┐
-│   Benutzer      │  Gibt Thema ein (z. B. "Was ist ein neuronales Netz?")
+│     User        │  Enters a topic (e.g. "How does 3D rendering work?")
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Hermes Agent   │  Erzeugt Gliederung, Folien-Text und Sprechscript
+│  Hermes Agent   │  Creates outline, slide text, and narration script
 └────────┬────────┘
          ▼
 ┌─────────────────┐     ┌──────────────────────┐
-│  Voice-Server   │◄────│ Audio-Datei (gesprochenes Script)
-│  (extern)       │     │ Format noch zu klären: WAV? MP3? AAC?
+│  Voice Server   │◄────│ Audio file (spoken script)
+│  (external)     │     │ Format still to be clarified: WAV? MP3? AAC?
 └────────┬────────┘     └──────────────────────┘
          │
          ▼
 ┌─────────────────┐     ┌──────────────────────┐
-│  Avatar-Server  │◄────│ Video des sprechenden Avatars
-│  (extern)       │     │ Format noch zu klären: MP4? WebM? Rohes Bildsequenz?
+│  Avatar Server  │◄────│ Video of speaking avatar
+│  (external)     │     │ Format still to be clarified: MP4? WebM? Raw image sequence?
 └────────┬────────┘     └──────────────────────┘
          │
          ▼
 ┌─────────────────┐
-│  Kompositions-  │  Fügt Folien, Avatar-Video und Audio zu einem
-│  Pipeline       │  finalen Erklärvideo zusammen (geplant, nicht implementiert)
+│  Composition    │  Combines slides, avatar video, and audio into
+│  Pipeline       │  a final explainer video (planned, not implemented)
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Finales Video  │  Ausgabe: synchronisiertes Präsentationsvideo
+│  Final Video    │  Output: synchronised presentation video
 └─────────────────┘
 ```
 
-### Bisher verfügbar
+### Currently Available
 
-- Hermes Agent als Orchestrierungssystem (läuft)
-- Grundlegende Konzeptidee und diese Planungsdokumentation
+- Hermes Agent as the orchestration system (running)
+- Basic concept idea and this planning documentation
 
-### Noch nicht verfügbar / Zukünftig
+### Not Yet Available / Future
 
-- Voice-Server: Muss noch bereitgestellt und angebunden werden
-- Avatar-Server: Muss noch bereitgestellt und angebunden werden
-- Kompositions-Pipeline: Noch nicht implementiert
-- Slide-Rendering-Engine: Noch nicht ausgewählt (Manim, Reveal.js, Pandoc-beamer, etc.)
-
----
-
-## Integration der externen Dienste (Planung)
-
-Da Avatar- und Voice-Systeme auf separaten Servern laufen sollen, müssen Schnittstellen geplant werden. Folgende Kommunikationsansätze sind denkbar:
-
-| Ansatz | Beschreibung | Offene Fragen |
-|--------|--------------|---------------|
-| **REST API** | Synchrone HTTP-Anfrage mit Audio/Video als Response | Maximale Dateigröße? Timeout bei langer Generierung? |
-| **WebSocket API** | Stream-basierte Übertragung für Echtzeit-Feedback | Unterstützen die Server Streaming? |
-| **Job-Queue** | Async-Modell: Auftrag einreichen → Status pollen → Ergebnis abholen | Welcher Queue-Mechanismus? Redis? RabbitMQ? Eigenes System? |
-| **Polling für Job-Status** | Kombination mit REST: POST zum Starten, GET für Status, GET für Ergebnis | Wie lange wird ein Job gespeichert? Retry-Logik? |
-| **Shared Storage** | Generierte Dateien werden in einem gemeinsamen Speicher abgelegt (NFS, S3, SMB) | Wer kümmert sich um Bereinigung alter Dateien? |
-| **File Upload/Download Endpoints** | Explizite Upload-/Download-URLs pro Job | Authentifizierung pro Endpunkt? Expiry der URLs? |
-
-### Empfohlene Richtung (vorläufig)
-
-Ein **Job-Queue-Modell mit REST-Polling** scheint für Generierungsaufgaben am robustesten, da Avatar- und Voice-Generierung nicht instantan sind. Die genaue Wahl hängt jedoch von den Fähigkeiten der externen Server ab.
+- **Voice Server:** Still to be provided and connected
+- **Avatar Server:** Still to be provided and connected
+- **Composition Pipeline:** Not yet implemented
+- **Slide Rendering Engine:** Not yet selected (Manim, Reveal.js,
+  Pandoc-beamer, etc.)
 
 ---
 
-## Offene technische Fragen
+## Integration of External Services (Planning)
 
-Die folgenden Punkte müssen geklärt werden, bevor eine Implementierung beginnen kann:
+Since the avatar and voice systems are intended to run on separate servers,
+interfaces must be planned. The following communication approaches are
+conceivable:
 
-### Voice-Server
+| Approach | Description | Open Questions |
+|----------|-------------|----------------|
+| **REST API** | Synchronous HTTP request with audio/video as response | Maximum file size? Timeout for long generation? |
+| **WebSocket API** | Stream-based transmission for real-time feedback | Do the servers support streaming? |
+| **Job Queue** | Async model: submit job → poll status → fetch result | Which queue mechanism? Redis? RabbitMQ? Custom system? |
+| **Polling for Job Status** | Combined with REST: POST to start, GET for status, GET for result | How long is a job retained? Retry logic? |
+| **Shared Storage** | Generated files placed in shared storage (NFS, S3, SMB) | Who handles cleanup of old files? |
+| **File Upload/Download Endpoints** | Explicit upload/download URLs per job | Authentication per endpoint? URL expiry? |
 
-1. Welche API bietet der Voice-Server? (REST, gRPC, WebSocket?)
-2. Welche Authentifizierung wird erwartet? (API-Key, OAuth, Token?)
-3. Welches Eingabeformat benötigt der Server? (Reiner Text? SSML? Mit Prosodie-Markup?)
-4. Welche Ausgabeformate liefert der Server? (WAV, MP3, OGG, FLAC? Welche Bitrate?)
-5. Gibt es eine Längenbegrenzung pro Anfrage? (Zeichen, Wörter, Sekunden?)
-6. Ist Batch-Verarbeitung möglich oder nur einzelne Sätze?
+### Recommended Direction (Preliminary)
 
-### Avatar-Server
-
-1. Welche API bietet der Avatar-Server?
-2. Benötigt der Server nur eine Audio-Datei als Eingabe (Audio-driven lip-sync), oder auch:
-   - Ein Prompt / Steuer-Text?
-   - Ein Referenzbild des Avatars?
-   - Ein Gesichts-Mesh / 3D-Modell?
-   - Ein Video als Stil-Referenz?
-3. Welche Ausgabeformate liefert der Server? (MP4, WebM, Bildsequenz als ZIP?)
-4. Welche Auflösung und Bildrate sind erreichbar?
-5. Wie lange dauert die Generierung pro Minute Audio? (Wichtig für Timeout-Planung)
-6. Werden mehrere Avatars / Personen unterstützt, oder nur ein spezifischer?
-
-### Datenfluss & Infrastruktur
-
-7. Wie werden generierte Assets zwischen den Servern übertragen? (Base64 in JSON? URL? Shared Storage?)
-8. Wo wird das finale Video gerendert? (Lokal auf Hermes-Maschine? Auf einem dedizierten Render-Server?)
-9. Welche Latenz ist für ein interaktives Erlebnis akzeptabel? (Minutes? Stunden?)
-10. Wie werden Fehler in der Pipeline behandelt? (Retry? Fallback auf Standard-Voice / Standard-Avatar?)
-11. Gibt es Speicherplatz- oder Bandbreiten-Einschränkungen zwischen den Servern?
-
-### Rechtliche und ethische Fragen
-
-12. Welche Einwilligungsdokumentation liegt für den verwendeten Avatar (Prof. Uwe Hahne) vor?
-13. Welche Lizenzbedingungen gelten für die generierten Videos? (Eigene? Der externen Dienste?)
-14. Welche Hinweise müssen in generierten Videos enthalten sein? ("KI-generiert", "Voice-Clone", etc.)
-15. Gibt es Einschränkungen bei der öffentlichen Veröffentlichung solcher Videos?
-
-### Folien & Inhalt
-
-16. Welches Tool soll Folien rendern? (Manim für mathematische Animationen? Reveal.js für Web-Slides? Pandoc für statische PDFs?)
-17. Wie werden Folien-Inhalte mit Audio-Script synchronisiert? (Zeitstempel? Kapitel-Marker?)
-18. Soll der Avatar nur im Vordergrund stehen, oder auch Folien im Hintergrund sichtbar sein?
+A **job-queue model with REST polling** seems most robust for generation tasks,
+since avatar and voice generation are not instantaneous. The final choice,
+however, depends on the capabilities of the external servers.
 
 ---
 
-## Mögliche Präsentationsthemen
+## Open Technical Questions
 
-Für ein späteres Prototyping sollten die Themen kurz genug für ein Demo-Video sein (ca. 1–3 Minuten), aber technisch substanziell genug, um den Nutzen des Systems zu zeigen.
+The following points must be clarified before implementation can begin.
 
-### Kategorien
+### Voice Server
 
-- Grundlegende Informatik-Konzepte
-- Grundlagen der Künstlichen Intelligenz
-- Medieninformatik / Computer Graphics
-- Mensch-Computer-Interaktion
-- Datenschutz und Ethik
-- Einführende Programmierkonzepte
+1. Which API does the voice server expose? (REST, gRPC, WebSocket?)
+2. Which authentication is expected? (API key, OAuth, token?)
+3. Which input format does the server need? (Plain text? SSML? Prosody markup?)
+4. Which output formats does the server deliver? (WAV, MP3, OGG, FLAC? Which bitrate?)
+5. Is there a length limit per request? (Characters, words, seconds?)
+6. Is batch processing possible, or only individual sentences?
 
-### Konkrete Themenvorschläge
+### Avatar Server
 
-| Nr. | Thema | Schätzung: Passend für Kurzvideo? |
-|-----|-------|-----------------------------------|
-| 1 | Was ist ein neuronales Netz? | ✅ Sehr gut — visuell erklärbar |
-| 2 | Wie funktioniert Bildklassifikation? | ✅ Gut — Beispielbilder unterstützen |
-| 3 | Was ist eine REST API? | ✅ Gut — Request/Response-Diagramme |
-| 4 | Wie rendert ein Computer 3D-Grafik? | ✅ Gut — Pipeline-Schritte visualisierbar |
-| 5 | Was ist Datenschutz? | ✅ Gut — Alltagsbeispiele |
-| 6 | Wie funktioniert Voice-Cloning? | ✅ Meta — das System erklärt sich selbst |
-| 7 | Was ist ein Chatbot? | ✅ Gut — Dialog-Verläufe zeigen |
-| 8 | Wie funktioniert ein Empfehlungssystem? | ✅ Gut — Matrix-Darstellung |
-| 9 | Überwachtes vs. unüberwachtes Lernen | ✅ Gut — Gegenüberstellung |
-| 10 | Wie funktioniert eine Suchmaschine? | ✅ Gut — Index-Crawling-Ranking |
-| 11 | Was ist ein Transformer? | ⚠️ Etwas abstrakt, aber mit Animation machbar |
-| 12 | Wie funktioniert eine Hash-Funktion? | ✅ Gut — Schritt-für-Schritt-Demo |
-| 13 | Was ist ein Version Control System (Git)? | ✅ Gut — Branch-/Merge-Visualisierung |
-| 14 | Was ist ein Docker-Container? | ✅ Gut — Container vs. VM vergleichen |
-| 15 | Wie funktioniert Public-Key-Kryptographie? | ⚠️ Abstrakt, aber mit Folien erklärbar |
+1. Which API does the avatar server expose?
+2. Does the server need only an audio file as input (audio-driven lip-sync), or also:
+   - A prompt / control text?
+   - A reference image of the avatar?
+   - A face mesh / 3D model?
+   - A video as style reference?
+3. Which output formats does the server deliver? (MP4, WebM, image sequence as ZIP?)
+4. Which resolution and frame rate are achievable?
+5. How long does generation take per minute of audio? (Important for timeout planning)
+6. Are multiple avatars / persons supported, or only a specific one?
 
-> **Empfohlene Prototyp-Themen:** Nr. 1, 3, 6 oder 10 — diese sind kurz, visuell unterstützbar und für ein breites Publikum verständlich.
+### Data Flow & Infrastructure
+
+7. How are generated assets transferred between servers? (Base64 in JSON? URL? Shared storage?)
+8. Where is the final video rendered? (Locally on the Hermes machine? On a dedicated render server?)
+9. Which latency is acceptable for an interactive experience? (Minutes? Hours?)
+10. How are errors in the pipeline handled? (Retry? Fallback to default voice / default avatar?)
+11. Are there storage or bandwidth constraints between the servers?
+
+### Legal and Ethical Questions
+
+12. Which consent documentation exists for the avatar used (Prof. Dr. Uwe Hahne)?
+13. Which licence conditions apply to the generated videos? (Own? The external services'?)
+14. Which notices must be included in generated videos? ("AI-generated", "Voice clone", etc.)
+15. Are there restrictions on public publication of such videos?
+
+### Slides & Content
+
+16. Which tool should render slides? (Manim for mathematical animations? Reveal.js for web slides? Pandoc for static PDFs?)
+17. How are slide contents synchronised with the audio script? (Timestamps? Chapter markers?)
+18. Should the avatar appear only in the foreground, or should slides also be visible in the background?
 
 ---
 
-## Vorgeschlagene Entwicklungsphasen
+## Suggested Presentation Topics
 
-### Phase 1 — Konzept und Anforderungen
+For later prototyping, topics should be short enough for a demo video (approx.
+1–3 minutes) but technically substantial enough to demonstrate the usefulness
+of the system. The topics below are aligned with the research and teaching
+areas of **Prof. Dr. Uwe Hahne** — primarily **media informatics, computer
+graphics, human–computer interaction, web/mobile technologies, and AI
+fundamentals**.
 
-**Ziel:** Klare Rahmenbedingungen definieren, bevor technische Arbeit beginnt.
+### Topic Categories
 
-- [ ] Ziel-Videoformat festlegen (Auflösung, Bildrate, Länge, Zielplattform)
-- [ ] Externe Dienste identifizieren und deren Verfügbarkeit prüfen
-- [ ] Eingabe- und Ausgabe-Formate definieren (was gibt der Nutzer rein, was kommt raus?)
-- [ ] Ein Prototyp-Thema aus der obigen Liste wählen
-- [ ] Rechtliche Einwilligungen für Avatar und Voice prüfen
+- Computer Graphics and Visualisation
+- Human–Computer Interaction (HCI)
+- Virtual and Augmented Reality
+- Web and Mobile Technologies
+- Artificial Intelligence and Machine Learning Fundamentals
+- Game Development and Interactive Media
 
-**Ergebnis:** Requirements-Dokument, ausgewähltes Thema, bestätigte Dienst-Verfügbarkeit.
+### Concrete Topic Suggestions
 
-### Phase 2 — Schnittstellenplanung
+| No. | Topic | Why It Fits Prof. Hahne's Areas |
+|-----|-------|--------------------------------|
+| 1 | **How does 3D rendering work?** | Core computer graphics topic |
+| 2 | **What is ray tracing?** | Classic graphics rendering technique |
+| 3 | **How does a shader program work?** | GPU graphics pipeline |
+| 4 | **What is a polygon mesh?** | 3D modelling fundamentals |
+| 5 | **How does texture mapping work?** | Graphics texturing |
+| 6 | **What is the rendering pipeline?** | Core graphics concept |
+| 7 | **How does augmented reality (AR) work?** | AR/VR fundamentals |
+| 8 | **What is the difference between VR and AR?** | Mixed reality concepts |
+| 9 | **How does computer animation work?** | Animation principles |
+| 10 | **What are skeletal animation and rigging?** | Character animation basics |
+| 11 | **What is human–computer interaction (HCI)?** | HCI fundamentals |
+| 12 | **How does a touch interface work?** | Interaction design |
+| 13 | **What is usability engineering?** | HCI design methodology |
+| 14 | **How does a search engine work?** | Web technology / information retrieval |
+| 15 | **What is a REST API?** | Web development fundamentals |
+| 16 | **How does responsive web design work?** | Modern web technology |
+| 17 | **What is a neural network?** | AI fundamentals |
+| 18 | **How does image classification work?** | Computer vision basics |
+| 19 | **What is the difference between supervised and unsupervised learning?** | ML core concept |
+| 20 | **How does a recommendation system work?** | Practical AI application |
+| 21 | **What is a game engine?** | Game development fundamentals |
+| 22 | **How does real-time physics simulation work in games?** | Interactive media |
+| 23 | **What is procedural content generation?** | Game design + AI overlap |
+| 24 | **How does motion capture work?** | Animation technology |
+| 25 | **What is data visualisation?** | Graphics + HCI overlap |
 
-**Ziel:** API-Verträge und Datenflüsse zwischen Hermes, Voice-Server und Avatar-Server definieren.
+> **Recommended Prototype Topics:** No. 1, 11, 15, 17, or 21 — these are
+> concise, visually supportable, and understandable for a broad audience.
 
-- [ ] API-Spezifikation für Voice-Server erstellen (Request/Response-Schema, Auth, Fehlercodes)
-- [ ] API-Spezifikation für Avatar-Server erstellen
-- [ ] Dateiübertragungsmethode festlegen (Upload-URL, Shared Storage, Base64, etc.)
-- [ ] Erwartete Response-Formate dokumentieren (Audio: WAV/MP3? Video: MP4/WebM? Metadaten?)
-- [ ] Job-Status-Polling-Schema definieren (wie oft pollen? Welche Status-Codes?)
+---
 
-**Ergebnis:** API-Dokumentation, OpenAPI/Swagger-Spec (optional), Test-Cases für jede Schnittstelle.
+## Proposed Development Phases
 
-### Phase 3 — Prototyp-Pipeline-Design
+### Phase 1 — Concept and Requirements
 
-**Ziel:** Den vollständigen Ablauf vom Thema bis zum Roh-Video planen, ohne die echten Server aufzurufen.
+**Goal:** Define clear framework conditions before technical work begins.
 
-- [ ] Slide-Generation planen: Wie wandelt Hermes ein Thema in strukturierte Folien um?
-- [ ] Narrations-Generierung planen: Wie wird aus Folien ein flüssiges Sprechscript?
-- [ ] Synchronisation planen: Wie werden Folien, Audio-Timing und Avatar-Video aufeinander abgestimmt?
-- [ ] Fallback-Strategien definieren: Was passiert, wenn ein Server ausfällt oder zu langsam ist?
+- [ ] Define target video format (resolution, frame rate, length, target platform)
+- [ ] Identify external services and check their availability
+- [ ] Define input and output formats (what does the user enter, what comes out?)
+- [ ] Select one prototype topic from the list above
+- [ ] Check legal consent for avatar and voice usage
 
-**Ergebnis:** Architektur-Dokument, Sequenzdiagramm, Fehlerbehandlungskonzept.
+**Result:** Requirements document, selected topic, confirmed service availability.
 
-### Phase 4 — Zukünftige Implementierung
+### Phase 2 — Interface Planning
 
-**Ziel:** Die geplante Pipeline mit echten Diensten umsetzen.
+**Goal:** Define API contracts and data flows between Hermes, the voice server,
+and the avatar server.
 
-> **Hinweis:** Diese Phase setzt voraus, dass Phase 1–3 abgeschlossen sind und die externen Server betriebsbereit sind.
+- [ ] Create API specification for voice server (request/response schema, auth, error codes)
+- [ ] Create API specification for avatar server
+- [ ] Decide file transfer method (upload URL, shared storage, Base64, etc.)
+- [ ] Document expected response formats (Audio: WAV/MP3? Video: MP4/WebM? Metadata?)
+- [ ] Define job-status polling schema (how often to poll? Which status codes?)
 
-- [ ] Implementierung der Voice-Server-Integration
-- [ ] Implementierung der Avatar-Server-Integration
-- [ ] Implementierung der Video-Kompositions-Pipeline (Folien + Avatar + Audio)
-- [ ] Testing mit echten generierten Assets
-- [ ] Iteration und Feinschliff basierend auf Testergebnissen
+**Result:** API documentation, OpenAPI/Swagger spec (optional), test cases for each interface.
 
-**Ergebnis:** Lauffähiger Prototyp, der ein Demo-Video für das in Phase 1 gewählte Thema erzeugt.
+### Phase 3 — Prototype Pipeline Design
+
+**Goal:** Plan the complete flow from topic to raw video without calling the
+real servers.
+
+- [ ] Plan slide generation: How does Hermes turn a topic into structured slides?
+- [ ] Plan narration generation: How are slides turned into a fluid speech script?
+- [ ] Plan synchronisation: How are slides, audio timing, and avatar video aligned?
+- [ ] Define fallback strategies: What happens if a server fails or is too slow?
+
+**Result:** Architecture document, sequence diagram, error-handling concept.
+
+### Phase 4 — Future Implementation
+
+**Goal:** Implement the planned pipeline with real services.
+
+> **Note:** This phase requires completion of Phases 1–3 and the external
+> servers to be operational.
+
+- [ ] Implement voice-server integration
+- [ ] Implement avatar-server integration
+- [ ] Implement video composition pipeline (slides + avatar + audio)
+- [ ] Test with real generated assets
+- [ ] Iterate and refine based on test results
+
+**Result:** Working prototype that produces a demo video for the topic selected in Phase 1.
 
 ---
 
 ## Lessons Learned
 
-> *Wird ergänzt, sobald Phase 1–3 abgeschlossen sind und erste Erkenntnisse vorliegen.*
+> *To be added once Phases 1–3 are completed and initial insights are
+> available.*
 
-## Ergebnisse
+## Results
 
 !!! note "Work in Progress"
-    Ergebnisse werden hier dokumentiert, sobald das Projekt abgeschlossen ist.
-    Aktuell liegt nur die Planungsdokumentation vor.
+    Results will be documented here once the project is completed.
+    At present only the planning documentation is available.

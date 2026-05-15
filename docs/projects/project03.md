@@ -1,48 +1,44 @@
-# Projekt 3 — Educational Video Generation System
+# Project 3 — Educational Video Generation System
 
-## Thema
+## Topic
 
-Entwicklung eines Systems zur automatisierten Erzeugung von didaktischen
-Erklärvideos im Präsentations-Stil. Ein Avatar-basierter Moderator führt
-durch Inhalte, die auf Folien visualisiert werden, und spricht einen
-passenden Erklärtext.
+Development of a system for automated creation of didactic explainer videos in a
+presentation-style format. An avatar-based presenter guides through content
+visualised on slides and delivers a matching narration.
 
-## Ziele
+## Goals
 
-- Konzeption einer Orchestrierungspipeline für Erklärvideos
-- Planung der Integration externer Dienste (Avatar-Generierung,
-  Voice-Cloning)
-- Definition von Schnittstellen und Datenflüssen zwischen verteilten
-  Komponenten
-- Dokumentation möglicher Architekturen, Phasen und offener Fragen
-- Sammlung geeigneter Demo-Themen für ein zukünftiges Prototyping
+- Conceive an orchestration pipeline for explainer videos
+- Plan the integration of external services (avatar generation, voice cloning)
+- Define interfaces and data flows between distributed components
+- Document possible architectures, phases, and open questions
+- Collect suitable demo topics aligned with Prof. Dr. Uwe Hahne's teaching areas
 
 ## Status
 
-> **Planungsphase** — Das Projekt befindet sich ausschließlich in der
-> Konzeption und Dokumentation. Weder Avatar-Modelle noch Voice-Clones
-> wurden trainiert, und keine Videos wurden generiert. Eine spätere
-> Implementierung setzt die Klärung der hier dokumentierten offenen
-> Fragen und die Verfügbarkeit der externen Dienste voraus.
+> **Planning phase only** — This project is exclusively in the conception and
+> documentation stage. No implementation, training, or generation has been
+> carried out. A later implementation depends on clarifying the open questions
+> documented here and on the availability of the external services.
 
-## Tools und Ressourcen
+## Tools and Resources
 
-| Tool / System | Verwendung |
-|---------------|-----------|
-| Hermes Agent | Orchestrierung, Content-Planung, Skript-Generierung |
-| Externer Avatar-Server | Generierung des Moderator-Avatars (Deepfake / NeRF / Bild-zu-Video) |
-| Externer Voice-Server | Synthese der gesprochenen Narration (Voice-Cloning / TTS) |
-| Python / FastAPI | Backend für Workflow-Orchestrierung (optional, zukünftig) |
-| MkDocs / Pandoc / Manim | Folien-Rendering / Export (geplant) |
-| FFmpeg | Audio/Video-Komposition (geplant) |
+| Tool / System | Purpose |
+|---------------|---------|
+| Hermes Agent | Orchestration, content planning, script generation |
+| External Avatar Server | Generation of the presenter avatar (deepfake / NeRF / image-to-video) |
+| External Voice Server | Synthesis of spoken narration (voice cloning / TTS) |
+| Python / FastAPI | Backend for workflow orchestration (optional, future) |
+| MkDocs / Pandoc / Manim | Slide rendering / export (planned) |
+| FFmpeg | Audio/video composition (planned) |
 
-## Ergebnisse
+## Results
 
 !!! note "Work in Progress"
-    Ergebnisse werden hier dokumentiert, sobald das Projekt abgeschlossen
-    ist. Aktuell liegt nur die Planungsdokumentation vor.
+    Results will be documented here once the project is completed. At present
+    only the planning documentation is available.
 
-## Dokumentation
+## Documentation
 
-Detaillierte technische Dokumentation findest du unter
-[Dokumentation → Projekt 3](../docs/project03.md).
+Detailed technical documentation can be found at
+[Documentation → Project 3](../docs/project03.md).
