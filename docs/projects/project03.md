@@ -28,7 +28,7 @@ visualised on slides and delivers a matching narration.
 |---------------|---------|
 | Hermes Agent (Presentation Agent) | Orchestration, script generation, deepfake generation, final composition |
 | External Image Agent | Generation and delivery of reference face images for the avatar (one-time intake per character) |
-| External Voice Agent | On-demand voice cloning and text-to-speech synthesis via REST API |
+| External Voice Agent | On-demand text-to-speech synthesis via REST API using built-in voices |
 | Python / FastAPI | Backend for workflow orchestration (optional, future) |
 | **Reveal.js** + Chrome Headless | HTML slide generation and slide-video rendering |
 | **LivePortrait** | Primary deepfake tool — audio-driven single-image talking-head avatar |

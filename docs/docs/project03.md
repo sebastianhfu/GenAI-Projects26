@@ -92,9 +92,11 @@ User ──► Presentation Agent        │
 
 ## Voice Service API Specification (Required)
 
-The Voice Agent is an **external REST API service** responsible for voice
-cloning and text-to-speech synthesis. The Presentation Agent calls it on demand,
-once per slide narration passage.
+The Voice Agent is an **external REST API service** responsible for
+text-to-speech synthesis using its own built-in voices. The Presentation Agent
+calls it on demand, once per slide narration passage. **No external voice
+samples or cloning are required** — all voices are managed internally by the
+Voice Agent.
 
 ### Base URL
 
@@ -110,48 +112,17 @@ V0 (proposed): https://<voice-agent-host>:<port>/api/v1
 
 ### Endpoints
 
-#### 1. `POST /api/v1/clone`
+#### 1. `POST /api/v1/speak`
 
-Create a new cloned voice from a reference audio sample.
-
-**Request:**
-- `Content-Type: multipart/form-data`
-- **Body Fields:**
-  - `reference_audio` (File, required) — Original speaker audio clip.
-    Minimum 3–10 seconds recommended. Format: WAV, MP3, M4A.
-  - `speaker_name` (String, optional) — Human-readable label (e.g.,
-    `"Prof. Hahne — Formal"`). Returned as `voice_id`.
-  - `language` (String, optional) — ISO language code hint, e.g., `"en"`,
-    `"de"`, `"auto"`.
-
-**Response (201 Created):**
-```json
-{
-  "voice_id": "spk_7a1f3e2c",
-  "speaker_name": "Prof. Hahne — Formal",
-  "status": "ready",
-  "sample_rate": 24000,
-  "supported_languages": ["en", "de"]
-}
-```
-
-**Errors:**
-- `400 Bad Request` — Audio too short, unsupported format
-- `401 Unauthorized` — Invalid API token
-- `413 Payload Too Large` — Audio file exceeds size limit
-- `422 Unprocessable Entity` — Voice cloning failed, no speech detected
-
-#### 2. `POST /api/v1/speak`
-
-Synthesize speech from text using a previously cloned voice.
+Synthesize speech from text using the Voice Agent's built-in voice.
 
 **Request:**
 - `Content-Type: application/json`
 - **Body:**
 ```json
 {
-  "voice_id": "spk_7a1f3e2c",
   "text": "Neural Radiance Fields reconstruct a 3D scene...",
+  "voice_id": "default",
   "output_format": "wav",
   "output_bitrate": 128,
   "speed": 1.0,
@@ -160,8 +131,8 @@ Synthesize speech from text using a previously cloned voice.
 ```
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `voice_id` | String | **Yes** | ID returned by `/clone` or a pre-existing voice |
 | `text` | String | **Yes** | Text to synthesise. Max length TBD (e.g., 500–5000 chars) |
+| `voice_id` | String | No | Built-in voice preset, e.g. `"default"`, `"formal"`, `"friendly"`. Defaults to `"default"`. |
 | `output_format` | String | No | `"wav"`, `"mp3"` (default: `"wav"`) |
 | `output_bitrate` | Integer | No | Bitrate in kbps for lossy formats (default: `128`) |
 | `speed` | Float | No | Playback speed factor (default: `1.0`) |
@@ -195,7 +166,7 @@ Client then polls `GET /api/v1/jobs/{job_id}` until `status` becomes
 - `429 Too Many Requests` — Rate limit exceeded
 - `500/503` — Server-side synthesis error / queue full
 
-#### 3. `GET /api/v1/jobs/{job_id}` (Optional, required for Variant B)
+#### 2. `GET /api/v1/jobs/{job_id}` (Optional, required for Variant B)
 
 Poll the status of an asynchronous speak job.
 
@@ -219,35 +190,37 @@ Poll the status of an asynchronous speak job.
 | `"completed"` | Ready for download at `output_url` |
 | `"failed"` | Error; check `error_message` field |
 
-#### 4. `GET /api/v1/voices` (Optional)
+#### 3. `GET /api/v1/voices` (Optional)
 
-List all previously cloned voices.
+List all built-in voices available on the Voice Agent.
 
-**Response:**
+**Response (200 OK):**
 ```json
 {
   "voices": [
     {
-      "voice_id": "spk_7a1f3e2c",
-      "speaker_name": "Prof. Hahne — Formal",
-      "status": "ready",
-      "created_at": "2026-05-18T10:00:00Z"
+      "voice_id": "default",
+      "name": "Default",
+      "description": "General purpose",
+      "language": "en",
+      "gender": "male"
+    },
+    {
+      "voice_id": "formal",
+      "name": "Formal",
+      "description": "Professional presenter style",
+      "language": "en",
+      "gender": "male"
     }
   ]
 }
 ```
 
-#### 5. `DELETE /api/v1/voices/{voice_id}` (Optional)
-
-Remove a cloned voice. Returns `204 No Content`.
-
 ### Rate Limits & Quotas (To be confirmed by Voice Agent provider)
 
 | Resource | Proposed Limit |
 |----------|---------------|
-| `/clone` calls | e.g., 10 per hour |
-| `/speak` characters | e.g., 100,000 per day |
-| Max audio file size (upload) | e.g., 50 MB |
+| `/speak` text characters | e.g., 100,000 per day |
 | Max text length per `/speak` | e.g., 5,000 characters or 10 minutes audio |
 | Download URL expiry | e.g., 24 hours |
 
@@ -727,7 +700,7 @@ informatics**.
 **Goal:** Define clear framework conditions before technical work begins.
 
 - [x] Define target video format: **MP4, 1920×1080, 30 fps, H.264, AAC audio**
-- [x] Identify external services: Image Agent (image provider), Voice Agent (TTS/cloning)
+- [x] Identify external services: Image Agent (image provider), Voice Agent (TTS)
 - [x] Define input/output formats: topic string in → MP4 video out
 - [ ] Select one prototype topic from the list above
 - [ ] Check legal consent for avatar and voice usage
