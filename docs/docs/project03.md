@@ -126,7 +126,8 @@ Synthesize speech from text using the Voice Agent's built-in voice.
   "output_format": "wav",
   "output_bitrate": 128,
   "speed": 1.0,
-  "language": "en"
+  "language": "en",
+  "return_timestamps": true
 }
 ```
 | Field | Type | Required | Description |
@@ -137,14 +138,36 @@ Synthesize speech from text using the Voice Agent's built-in voice.
 | `output_bitrate` | Integer | No | Bitrate in kbps for lossy formats (default: `128`) |
 | `speed` | Float | No | Playback speed factor (default: `1.0`) |
 | `language` | String | No | ISO 639-1 override, e.g., `"en"`, `"de"` |
+| `return_timestamps` | Boolean | No | If `true`, return word- and sentence-level timing data. Default: `false` |
 
-**Response (200 OK):**
+**Response (200 OK) — Sync-Enhanced (Recommended):**
 
 Two variants depending on server capability (must be documented by provider):
 
-**Variant A — Direct Audio Blob:**
-- `Content-Type: audio/wav` (or `audio/mpeg` for MP3)
-- Response body: raw audio bytes
+**Variant A — Direct Audio Blob + Timestamps (when `return_timestamps: true`):**
+- `Content-Type: application/json`
+- Response body:
+```json
+{
+  "audio_base64": "UklGRiIAA...",
+  "format": "wav",
+  "duration_sec": 12.4,
+  "timestamps": {
+    "words": [
+      {"word": "Neural", "start": 0.00, "end": 0.38},
+      {"word": "Radiance", "start": 0.38, "end": 0.82},
+      {"word": "Fields", "start": 0.82, "end": 1.20},
+      {"word": "reconstruct", "start": 1.20, "end": 1.88},
+      {"word": "a", "start": 1.88, "end": 1.96},
+      {"word": "3D", "start": 1.96, "end": 2.30},
+      {"word": "scene...", "start": 2.30, "end": 3.10}
+    ],
+    "sentences": [
+      {"text": "Neural Radiance Fields reconstruct a 3D scene...", "start": 0.00, "end": 3.10}
+    ]
+  }
+}
+```
 
 **Variant B — Download URL (recommended when >10 MB):**
 - `Content-Type: application/json`
@@ -158,6 +181,9 @@ Two variants depending on server capability (must be documented by provider):
 ```
 Client then polls `GET /api/v1/jobs/{job_id}` until `status` becomes
 `"completed"`, then downloads from `output_url`.
+
+Also accepts `"return_timestamps": true` in the original `POST` body — if supported,
+timestamps are included in the completed job response.
 
 **Errors:**
 - `400 Bad Request` — Text too long, invalid voice_id, unsupported format
@@ -179,6 +205,15 @@ Poll the status of an asynchronous speak job.
   "output_url": "https://cdn.voice-agent.example/audio/job_9f8e2d1a.wav",
   "output_format": "wav",
   "duration_sec": 12.4,
+  "timestamps": {
+    "words": [
+      {"word": "Neural", "start": 0.00, "end": 0.38},
+      {"word": "Radiance", "start": 0.38, "end": 0.82}
+    ],
+    "sentences": [
+      {"text": "Neural Radiance Fields...", "start": 0.00, "end": 3.10}
+    ]
+  },
   "expires_at": "2026-05-18T15:00:00Z"
 }
 ```
@@ -399,7 +434,7 @@ The following points must be clarified before implementation can begin.
     - Wav2Lip: CPU-compatible fallback, slightly lower fidelity, slower
     - SadTalker: highest quality, very slow, reserved for final renders if needed
 14. **Slide rendering** *(Answered — Reveal.js HTML slides + Chrome headless capture)*
-15. **Synchronisation** *(Open — word-level timestamps from Voice Agent needed?)*
+15. **Synchronisation** *(Answered — word-level timestamps requested via `return_timestamps: true`)*
 16. **Final composition layout** *(Answered — see Pipeline Design below)*
 
 ### Data Flow & Infrastructure
@@ -618,13 +653,56 @@ project03/
 
 ### Timing Strategy
 
-Each slide needs its own audio duration. To sync the slide-to-avatar video:
+Each slide needs its own audio duration. To sync the slide-to-avatar video, the
+Presentation Agent uses the timing metadata returned by the Voice Agent (enabled
+via `"return_timestamps": true`):
 
-1. Generate audio → get exact duration `T` via `ffprobe` or `pydub`.
+1. Generate audio → get exact duration `T` via `ffprobe` or `duration_sec`.
 2. Render slide as a still image that loops for `T` seconds.
 3. Run LivePortrait with audio length = `T` → avatar video also = `T`.
 4. Overlay both and output a clip of exactly `T` seconds.
 5. Concatenate all clips in order.
+
+#### Using Timestamps for Slide-Content Synchronisation
+
+The word- and sentence-level `timestamps` array enables the Presentation Agent
+to **highlight or reveal elements on the slide as the avatar speaks**.
+
+**Example:**
+
+Voice Agent returns:
+```json
+"timestamps": {
+  "words": [
+    {"word": "First", "start": 0.00, "end": 0.35},
+    {"word": "Neural", "start": 0.35, "end": 0.72},
+    {"word": "Radiance", "start": 0.72, "end": 1.10},
+    {"word": "Fields", "start": 1.10, "end": 1.48}
+  ],
+  "sentences": [
+    {"text": "First, Neural Radiance Fields reconstruct a 3D scene from photos...", "start": 0.00, "end": 5.20}
+  ]
+}
+```
+
+**Slide-level synchronisation** (simplest):
+- When sentence `start` is reached → fade in slide highlight/bullet.
+- When sentence `end` is reached → trigger next slide transition.
+
+**Element-level synchronisation** (more advanced):
+- Map `word.start` timestamps to CSS class transitions in the Reveal.js slide.
+- e.g., at `start: 0.72` add `.highlight` to the word "Radiance" on the slide.
+
+**Fallback** if timestamps are unavailable:
+- Use sentence boundaries only (split by `", "` or `". "`).
+- Assign equal duration segments: `T / n_elements`.
+- Alternatively, use a silence-detection algorithm (`librosa`, `webrtcvad`) to
+detect natural pauses in the raw audio.
+
+> **Recommendation for Voice Agent team:** Provide `timestamps` with at least
+> sentence-level granularity; word-level is ideal. The `sentences` array is
+> sufficient for slide transition timing. The `words` array unlocks
+> karaoke-style word-by-word highlighting.
 
 ### GPU/VRAM Budget Estimate
 
