@@ -26,12 +26,14 @@ visualised on slides and delivers a matching narration.
 
 | Tool / System | Purpose |
 |---------------|---------|
-| Hermes Agent | Orchestration, content planning, script generation |
-| External Avatar Server | Generation of the presenter avatar (deepfake / NeRF / image-to-video) |
-| External Voice Server | Synthesis of spoken narration (voice cloning / TTS) |
+| Hermes Agent (Presentation Agent) | Orchestration, script generation, deepfake generation, final composition |
+| External Image Agent | Generation and delivery of reference face images for the avatar (one-time intake per character) |
+| External Voice Agent | On-demand voice cloning and text-to-speech synthesis via REST API |
 | Python / FastAPI | Backend for workflow orchestration (optional, future) |
-| MkDocs / Pandoc / Manim | Slide rendering / export (planned) |
-| FFmpeg | Audio/video composition (planned) |
+| **Reveal.js** + Chrome Headless | HTML slide generation and slide-video rendering |
+| **LivePortrait** | Primary deepfake tool — audio-driven single-image talking-head avatar |
+| **FFmpeg** | Final overlay composition (slides + avatar + audio → MP4) |
+| OpenCV, Pillow | Image validation and preprocessing for avatar intake |
 
 ## Results
 

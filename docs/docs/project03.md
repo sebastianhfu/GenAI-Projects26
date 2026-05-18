@@ -23,40 +23,56 @@ from these subject areas.
 
 ## Planned System Architecture
 
-The architecture is designed as a distributed system in which Hermes acts as
-the orchestration agent and coordinates multiple external services.
+The system is designed as a **distributed multi-agent pipeline** in which three
+autonomous agents collaborate, coordinated by Hermes as the Presentation Agent.
 
-### Data Flow (planned)
+### Multi-Agent Roles
+
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| **Image Agent** (external) | Avatar Material Provider | Generates and delivers reference face images for the presenter avatar. Images are provided once per character and cached locally for reuse. |
+| **Voice Agent** (external) | Voice Synthesis Service | Clones voices on demand and synthesizes speech audio for specific text passages requested by the Presentation Agent. Exposes a REST API. |
+| **Presentation Agent (Hermes)** | Orchestrator & Renderer | Generates slide content and narration scripts; requests audio from the Voice Agent; generates the deepfake talking-head video locally; composes the final presentation with slides, avatar video, and audio. |
+
+### Data Flow
 
 ```
-┌─────────────────┐
-│     User        │  Enters a topic (e.g. "How does NeRF reconstruct 3D scenes?")
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│  Hermes Agent   │  Creates outline, slide text, and narration script
-└────────┬────────┘
-         ▼
 ┌─────────────────┐     ┌──────────────────────┐
-│  Voice Server   │◄────│ Audio file (spoken script)
-│  (external)     │     │ Format still to be clarified: WAV? MP3? AAC?
-└────────┬────────┘     └──────────────────────┘
-         │
-         ▼
-┌─────────────────┐     ┌──────────────────────┐
-│  Avatar Server  │◄────│ Video of speaking avatar
-│  (external)     │     │ Format still to be clarified: MP4? WebM? Raw image sequence?
-└────────┬────────┘     └──────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Composition    │  Combines slides, avatar video, and audio into
-│  Pipeline       │  a final explainer video (planned, not implemented)
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│  Final Video    │  Output: synchronised presentation video
-└─────────────────┘
+│  Image Agent    │────►│ Reference face image │
+│  (external)     │     │ (one-time intake)    │
+└─────────────────┘     └──────────┬───────────┘
+                                     │
+                                     ▼
+                           ┌──────────────────┐
+                           │  Local Cache     │  Presentation Agent stores
+                           │  (avatars/*.jpg) │  validated avatar images
+                           └──────────────────┘
+                                    │
+User ──► Presentation Agent        │
+   "Create NeRF explainer"         │
+         │                          │
+         ├──► Generates slide outline & narration script
+         │                          │
+         ├──► POST /speak to Voice Agent
+         │     {text: "...", voice_id: "..."}
+         │                          │
+         │◄── Receives audio blob (WAV/MP3) or download URL
+         │                          │
+         ├──► Generates deepfake talking-head
+         │     Input: cached avatar image + audio
+         │     Tool: Wav2Lip / LivePortrait / SadTalker (local)
+         │     Output: synced avatar video clip (MP4)
+         │                          │
+         ├──► Renders slide visuals  │
+         │     (Manim / Reveal.js / Pandoc + HTML)
+         │                          │
+         └─► FFmpeg composition      │
+              Slides + avatar video + audio → final MP4
+                        │
+                        ▼
+              ┌──────────────────┐
+              │  Final MP4 File  │  Presentation output
+              └──────────────────┘
 ```
 
 ### Currently Available
@@ -66,34 +82,318 @@ the orchestration agent and coordinates multiple external services.
 
 ### Not Yet Available / Future
 
-- **Voice Server:** Still to be provided and connected
-- **Avatar Server:** Still to be provided and connected
-- **Composition Pipeline:** Not yet implemented
-- **Slide Rendering Engine:** Not yet selected (Manim, Reveal.js,
-  Pandoc-beamer, etc.)
+- **Image Agent service:** Connection protocol defined (REST v1), awaiting endpoint URL from other team
+- **Voice Agent service:** API contract defined (REST v1), awaiting endpoint URL from other team
+- **Local deepfake pipeline:** Tool selected (LivePortrait primary, Wav2Lip fallback); needs installation
+- **Reveal.js slide generator:** Method selected; needs template scaffolding
+- **FFmpeg composition script:** Pipeline design complete; implementation pending
 
 ---
 
-## Integration of External Services (Planning)
+## Voice Service API Specification (Required)
 
-Since the avatar and voice systems are intended to run on separate servers,
-interfaces must be planned. The following communication approaches are
-conceivable:
+The Voice Agent is an **external REST API service** responsible for voice
+cloning and text-to-speech synthesis. The Presentation Agent calls it on demand,
+once per slide narration passage.
 
-| Approach | Description | Open Questions |
-|----------|-------------|----------------|
-| **REST API** | Synchronous HTTP request with audio/video as response | Maximum file size? Timeout for long generation? |
-| **WebSocket API** | Stream-based transmission for real-time feedback | Do the servers support streaming? |
-| **Job Queue** | Async model: submit job → poll status → fetch result | Which queue mechanism? Redis? RabbitMQ? Custom system? |
-| **Polling for Job Status** | Combined with REST: POST to start, GET for status, GET for result | How long is a job retained? Retry logic? |
-| **Shared Storage** | Generated files placed in shared storage (NFS, S3, SMB) | Who handles cleanup of old files? |
-| **File Upload/Download Endpoints** | Explicit upload/download URLs per job | Authentication per endpoint? URL expiry? |
+### Base URL
 
-### Recommended Direction (Preliminary)
+```
+V0 (proposed): https://<voice-agent-host>:<port>/api/v1
+```
 
-A **job-queue model with REST polling** seems most robust for generation tasks,
-since avatar and voice generation are not instantaneous. The final choice,
-however, depends on the capabilities of the external servers.
+### Authentication
+
+| Header | Type | Description |
+|--------|------|-------------|
+| `Authorization: Bearer <token>` | API Token | Long-lived JWT or simple API key. Alternatively, `X-Voice-API-Key` header may be used. |
+
+### Endpoints
+
+#### 1. `POST /api/v1/clone`
+
+Create a new cloned voice from a reference audio sample.
+
+**Request:**
+- `Content-Type: multipart/form-data`
+- **Body Fields:**
+  - `reference_audio` (File, required) — Original speaker audio clip.
+    Minimum 3–10 seconds recommended. Format: WAV, MP3, M4A.
+  - `speaker_name` (String, optional) — Human-readable label (e.g.,
+    `"Prof. Hahne — Formal"`). Returned as `voice_id`.
+  - `language` (String, optional) — ISO language code hint, e.g., `"en"`,
+    `"de"`, `"auto"`.
+
+**Response (201 Created):**
+```json
+{
+  "voice_id": "spk_7a1f3e2c",
+  "speaker_name": "Prof. Hahne — Formal",
+  "status": "ready",
+  "sample_rate": 24000,
+  "supported_languages": ["en", "de"]
+}
+```
+
+**Errors:**
+- `400 Bad Request` — Audio too short, unsupported format
+- `401 Unauthorized` — Invalid API token
+- `413 Payload Too Large` — Audio file exceeds size limit
+- `422 Unprocessable Entity` — Voice cloning failed, no speech detected
+
+#### 2. `POST /api/v1/speak`
+
+Synthesize speech from text using a previously cloned voice.
+
+**Request:**
+- `Content-Type: application/json`
+- **Body:**
+```json
+{
+  "voice_id": "spk_7a1f3e2c",
+  "text": "Neural Radiance Fields reconstruct a 3D scene...",
+  "output_format": "wav",
+  "output_bitrate": 128,
+  "speed": 1.0,
+  "language": "en"
+}
+```
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `voice_id` | String | **Yes** | ID returned by `/clone` or a pre-existing voice |
+| `text` | String | **Yes** | Text to synthesise. Max length TBD (e.g., 500–5000 chars) |
+| `output_format` | String | No | `"wav"`, `"mp3"` (default: `"wav"`) |
+| `output_bitrate` | Integer | No | Bitrate in kbps for lossy formats (default: `128`) |
+| `speed` | Float | No | Playback speed factor (default: `1.0`) |
+| `language` | String | No | ISO 639-1 override, e.g., `"en"`, `"de"` |
+
+**Response (200 OK):**
+
+Two variants depending on server capability (must be documented by provider):
+
+**Variant A — Direct Audio Blob:**
+- `Content-Type: audio/wav` (or `audio/mpeg` for MP3)
+- Response body: raw audio bytes
+
+**Variant B — Download URL (recommended when >10 MB):**
+- `Content-Type: application/json`
+- Response body:
+```json
+{
+  "job_id": "job_9f8e2d1a",
+  "status": "processing",
+  "estimated_duration_sec": 15
+}
+```
+Client then polls `GET /api/v1/jobs/{job_id}` until `status` becomes
+`"completed"`, then downloads from `output_url`.
+
+**Errors:**
+- `400 Bad Request` — Text too long, invalid voice_id, unsupported format
+- `401 Unauthorized`
+- `404 Not Found` — voice_id does not exist
+- `429 Too Many Requests` — Rate limit exceeded
+- `500/503` — Server-side synthesis error / queue full
+
+#### 3. `GET /api/v1/jobs/{job_id}` (Optional, required for Variant B)
+
+Poll the status of an asynchronous speak job.
+
+**Response (200 OK):**
+```json
+{
+  "job_id": "job_9f8e2d1a",
+  "status": "completed",
+  "progress": 100,
+  "output_url": "https://cdn.voice-agent.example/audio/job_9f8e2d1a.wav",
+  "output_format": "wav",
+  "duration_sec": 12.4,
+  "expires_at": "2026-05-18T15:00:00Z"
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `"pending"` | Queued, not yet started |
+| `"processing"` | Synthesis in progress |
+| `"completed"` | Ready for download at `output_url` |
+| `"failed"` | Error; check `error_message` field |
+
+#### 4. `GET /api/v1/voices` (Optional)
+
+List all previously cloned voices.
+
+**Response:**
+```json
+{
+  "voices": [
+    {
+      "voice_id": "spk_7a1f3e2c",
+      "speaker_name": "Prof. Hahne — Formal",
+      "status": "ready",
+      "created_at": "2026-05-18T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 5. `DELETE /api/v1/voices/{voice_id}` (Optional)
+
+Remove a cloned voice. Returns `204 No Content`.
+
+### Rate Limits & Quotas (To be confirmed by Voice Agent provider)
+
+| Resource | Proposed Limit |
+|----------|---------------|
+| `/clone` calls | e.g., 10 per hour |
+| `/speak` characters | e.g., 100,000 per day |
+| Max audio file size (upload) | e.g., 50 MB |
+| Max text length per `/speak` | e.g., 5,000 characters or 10 minutes audio |
+| Download URL expiry | e.g., 24 hours |
+
+### Error Handling Responsibilities
+
+| Layer | Behaviour |
+|-------|-----------|
+| **Presentation Agent** | Retry `GET /jobs/{}` up to N times with exponential backoff; fallback to a default TTS voice if Voice Agent fails; log and skip slide if all fallbacks exhausted. |
+| **Voice Agent** | Return clear HTTP status codes + JSON `error_message`; never hang indefinitely on generation requests. |
+
+---
+
+## Image Agent Interface Specification (Required)
+
+The Image Agent is an **external service** responsible for generating or
+providing reference face images for the presenter avatar. The Presentation Agent
+receives images via a one-time intake and caches them locally for all subsequent
+deepfake generations.
+
+### Base URL
+
+```
+V0 (proposed): https://<image-agent-host>:<port>/api/v1
+```
+
+### Authentication
+
+| Header | Type | Description |
+|--------|------|-------------|
+| `Authorization: Bearer <token>` | API Token | Long-lived JWT or simple API key. |
+
+### Endpoints
+
+#### 1. `POST /api/v1/avatars`
+
+Generate or upload a reference face image for a new presenter character.
+
+**Request (if generating):**
+- `Content-Type: application/json`
+- **Body:**
+```json
+{
+  "character_name": "Prof. Hahne",
+  "prompt": "Professional head-and-shoulders portrait of a middle-aged male professor, ...",
+  "style": "photorealistic",
+  "negative_prompt": "blurry, low quality, multiple faces, ...",
+  "return_format": "url"
+}
+```
+
+**Request (if uploading seed images for generation):**
+- `Content-Type: multipart/form-data`
+- **Body Fields:**
+  - `seed_images[]` (Files, required) — Reference photos of the person
+  - `character_name` (String, required)
+
+**Response (201 Created — URL variant):**
+```json
+{
+  "avatar_id": "avt_9b2c4d1e",
+  "character_name": "Prof. Hahne",
+  "image_url": "https://cdn.image-agent.example/avatars/avt_9b2c4d1e.jpg",
+  "dimensions": [1024, 1024],
+  "format": "jpeg",
+  "expires_at": "2026-06-18T10:00:00Z"
+}
+```
+
+**Response (201 Created — Base64 variant, not recommended for large files):**
+```json
+{
+  "avatar_id": "avt_9b2c4d1e",
+  "character_name": "Prof. Hahne",
+  "image_base64": "/9j/4AAQSkZJRgABAQAAAQ...",
+  "dimensions": [1024, 1024],
+  "format": "jpeg"
+}
+```
+
+**Errors:**
+- `400 Bad Request` — Invalid prompt, unsupported format
+- `401 Unauthorized`
+- `413 Payload Too Large` — Upload size exceeded
+- `422 Unprocessable Entity` — Generation failed, no face detected
+
+#### 2. `GET /api/v1/avatars/{avatar_id}`
+
+Download a previously generated avatar image.
+
+**Response:**
+- `Content-Type: image/jpeg` (or `image/png`)
+- Body: raw image bytes (or 307 redirect to `image_url`)
+
+#### 3. `GET /api/v1/avatars`
+
+List all available avatars.
+
+**Response (200 OK):**
+```json
+{
+  "avatars": [
+    {
+      "avatar_id": "avt_9b2c4d1e",
+      "character_name": "Prof. Hahne",
+      "image_url": "https://cdn.image-agent.example/avatars/avt_9b2c4d1e.jpg",
+      "dimensions": [1024, 1024],
+      "created_at": "2026-05-18T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 4. `DELETE /api/v1/avatars/{avatar_id}`
+
+Remove an avatar. Returns `204 No Content`.
+
+### Intake Workflow (Presentation Agent Side)
+
+Once per project / per character:
+
+```python
+# 1. Request avatar from Image Agent
+response = requests.post("https://image-agent/api/v1/avatars", json=payload)
+avatar_url = response.json()["image_url"]
+
+# 2. Download and validate locally
+img = download(avatar_url)
+assert img.width >= 512 and img.height >= 512
+assert detect_face(img)  # at least one face visible
+
+# 3. Cache locally
+save(img, f"avatars/{avatar_id}.jpg")
+
+# 4. Reuse for every slide's deepfake generation
+```
+
+### Local Cache Requirements
+
+| Requirement | Spec |
+|-------------|------|
+| **Cache path** | `avatars/<avatar_id>.<ext>` |
+| **Formats** | JPEG or PNG |
+| **Min resolution** | 512×512 (recommended: 1024×1024) |
+| **Max resolution** | 2048×2048 (to limit VRAM) |
+| **Validation** | Face detected via OpenCV / MediaPipe dlib |
+| **Cleanup** | Expire and re-request after 30 days or on demand |
 
 ---
 
@@ -101,48 +401,267 @@ however, depends on the capabilities of the external servers.
 
 The following points must be clarified before implementation can begin.
 
-### Voice Server
+### Voice Agent
 
-1. Which API does the voice server expose? (REST, gRPC, WebSocket?)
-2. Which authentication is expected? (API key, OAuth, token?)
-3. Which input format does the server need? (Plain text? SSML? Prosody markup?)
-4. Which output formats does the server deliver? (WAV, MP3, OGG, FLAC? Which bitrate?)
-5. Is there a length limit per request? (Characters, words, seconds?)
-6. Is batch processing possible, or only individual sentences?
+1. Which API does the voice server expose? *(Answered — assumed REST with `/clone`, `/speak`, `/jobs`)*
+2. Which authentication is expected? *(Answered — `Bearer` token or `X-Voice-API-Key`)*
+3. Which input format does the server need? Plain text; SSML optional? *(Open)*
+4. Which output formats does the server deliver? *(Proposed: WAV or MP3, 24 kHz)*
+5. Is there a length limit per request? *(Open — propose 5,000 chars / 10 min audio)*
+6. Is batch processing possible, or only individual sentences? *(Open)*
 
-### Avatar Server
+### Image Agent
 
-1. Which API does the avatar server expose?
-2. Does the server need only an audio file as input (audio-driven lip-sync), or also:
-   - A prompt / control text?
-   - A reference image of the avatar?
-   - A face mesh / 3D model?
-   - A video as style reference?
-3. Which output formats does the server deliver? (MP4, WebM, image sequence as ZIP?)
-4. Which resolution and frame rate are achievable?
-5. How long does generation take per minute of audio? (Important for timeout planning)
-6. Are multiple avatars / persons supported, or only a specific one?
+7. How are images delivered? *(Proposed: URL download + local cache)*
+8. What resolution/format guarantee? *(Proposed: min 512×512, JPEG/PNG, frontal face)*
+9. How long do images remain available on the Image Agent? *(Proposed: 30-day URL expiry, local cache canonical)*
+10. Can multiple angles/expressions be requested for better deepfake quality? *(Open)*
+11. Can the same avatar image be reused indefinitely, or per-project refresh required? *(Proposed: indefinite reuse, per-project refresh at agent discretion)*
+12. Are there licence restrictions on generated images? *(Open — consent for Prof. Hahne required)*
+
+### Presentation Agent (Local Pipeline)
+
+13. **Deepfake tool selection** *(Answered — LivePortrait primary; Wav2Lip fallback)*
+    - LivePortrait: best speed/quality, CUDA required, ~4 GB VRAM, 512–1024 px input
+    - Wav2Lip: CPU-compatible fallback, slightly lower fidelity, slower
+    - SadTalker: highest quality, very slow, reserved for final renders if needed
+14. **Slide rendering** *(Answered — Reveal.js HTML slides + Chrome headless capture)*
+15. **Synchronisation** *(Open — word-level timestamps from Voice Agent needed?)*
+16. **Final composition layout** *(Answered — see Pipeline Design below)*
 
 ### Data Flow & Infrastructure
 
-7. How are generated assets transferred between servers? (Base64 in JSON? URL? Shared storage?)
-8. Where is the final video rendered? (Locally on the Hermes machine? On a dedicated render server?)
-9. Which latency is acceptable for an interactive experience? (Minutes? Hours?)
-10. How are errors in the pipeline handled? (Retry? Fallback to default voice / default avatar?)
-11. Are there storage or bandwidth constraints between the servers?
+17. How are generated assets transferred? *(Proposed: URL + local download, no shared storage dependency)*
+18. Where is the final video rendered? *(Answered — locally on Hermes machine via FFmpeg)*
+19. Which latency is acceptable? *(Open — target: <5 min for a 2-slide demo)*
+20. Error handling strategy? *(Proposed: retry 3× with backoff, fallback to default voice, skip-slide fallback)*
+21. Storage/bandwidth constraints? *(Open)*
 
 ### Legal and Ethical Questions
 
-12. Which consent documentation exists for the avatar used (Prof. Dr. Uwe Hahne)?
-13. Which licence conditions apply to the generated videos? (Own? The external services'?)
-14. Which notices must be included in generated videos? ("AI-generated", "Voice clone", etc.)
-15. Are there restrictions on public publication of such videos?
+22. Which consent documentation exists for the avatar used (Prof. Dr. Uwe Hahne)? *(Open)*
+23. Which licence conditions apply to the generated videos? *(Open)*
+24. Which notices must be included? *(Proposed: watermark text — "AI-generated avatar & voice")*
+25. Are there restrictions on public publication? *(Open)*
 
-### Slides & Content
+### Tooling Selection (Answered)
 
-16. Which tool should render slides? (Manim for mathematical animations? Reveal.js for web slides? Pandoc for static PDFs?)
-17. How are slide contents synchronised with the audio script? (Timestamps? Chapter markers?)
-18. Should the avatar appear only in the foreground, or should slides also be visible in the background?
+| Decision | Chosen Tool | Rationale |
+|----------|-------------|-----------|
+| Deepfake engine | **LivePortrait** | Real-time inference, single-image input, high-quality lip-sync and head motion, 4 GB VRAM minimum, supports arbitrary driving audio |
+| Deepfake fallback | **Wav2Lip** | CPU-compatible, well-tested, lower fidelity but always available |
+| Slide renderer | **Reveal.js** + Chrome Headless | HTML-based, easy to generate dynamically, can be captured to video frame-by-frame or stitched as image sequence |
+| Slide-to-video | **Chrome DevTools Protocol** or **Playwright** | Render Reveal.js to images/MP4 at target resolution |
+| Composition | **FFmpeg** | Overlay avatar onto slides, mix audio, add intro/outro fades |
+| Avatar preprocessing | **OpenCV / dlib / MediaPipe** | Face detection, alignment, cropping to LivePortrait input specs |
+
+---
+
+## Pipeline Design — Full Architecture
+
+This section details how the Presentation Agent executes the complete end-to-end
+flow from a topic string to a final MP4 video.
+
+### Step-by-Step Flow
+
+```
+┌──────────────┐
+│  User Input  │  "Explain NeRF in 3 slides"
+└──────┬───────┘
+       ▼
+┌────────────────────────────┐
+│  Step 1: Script Generation │  Hermes writes outline + narration text
+│  (Presentation Agent)      │  per slide (~30–90 sec each)
+└────────────┬───────────────┘
+             ▼
+┌────────────────────────────┐
+│  Step 2: Slide Rendering │  Generate Reveal.js HTML slides
+│  (Presentation Agent)      │  Capture each slide to static image
+│                            │  (Playwright / Chrome headless)
+└────────────┬───────────────┘
+             ▼
+┌────────────────────────────┐
+│  Step 3: Audio Generation  │  POST /api/v1/speak per slide
+│  (Voice Agent API)         │  Returns WAV/MP3 audio file
+└────────────┬───────────────┘
+             ▼
+┌────────────────────────────┐
+│  Step 4: Deepfake Avatar   │  LivePortrait generates talking-head
+│  (Local GPU, LivePortrait) │  from cached avatar image + audio
+│                            │  Output: MP4 (avatar with audio lipsync)
+└────────────┬───────────────┘
+             ▼
+┌────────────────────────────┐
+│  Step 5: Composition       │  FFmpeg overlays avatar onto slide image,
+│  (Local, FFmpeg)           │  syncs on each slide's audio duration,
+│                            │  adds intro/outro fade, watermark
+└────────────┬───────────────┘
+             ▼
+┌────────────────────────────┐
+│  Final MP4                 │  Continuous video: slides + talking avatar
+└────────────────────────────┘
+```
+
+### Tool Selections
+
+#### 1. Deepfake — LivePortrait (Primary)
+
+LivePortrait takes a **single static portrait image** and a **driving audio**
+(and optionally a driving video for expressions) and produces a realistic
+animated talking-head video with natural head motion, eye blinks, and lip
+synchronisation. It is the current best open-source choice for one-image
+animation because:
+
+* **Speed** — Real-time inference on modern GPUs; a 30-second clip in <30 s.
+* **Quality** — High-fidelity facial animation, no uncanny-stiff head.
+* **Input flexibility** — Single image is sufficient (no video or mesh needed).
+* **Audio driven** — Can accept raw audio via a helper pipeline (audio →
+  expression coefficients → animation).
+
+**Requirements:**
+* GPU with ≥4 GB VRAM (ideally ≥8 GB for 1024×1024 input)
+* PyTorch ≥2.0, CUDA toolkit matching PyTorch version
+* Input image: 512×512 or 1024×1024, frontal face clearly visible
+* Linux recommended (available for this system ✓)
+
+**Alternatives evaluated:**
+
+| Tool | Speed | Quality | VRAM | Pros | Cons |
+|------|-------|---------|------|------|------|
+| *(Primary)* | | | | | |
+| **LivePortrait** | Real-time | Excellent | 4–8 GB | Best single-image animation | Needs expression model for pure audio |
+| *Fallbacks* | | | | | |
+| **Wav2Lip** | Slow-ish | Good | 2–4 GB | Mature, works CPU-only | Head is static, less natural |
+| **SadTalker** | Very slow | Excellent | 8+ GB | Highest lip fidelity | Inference ~1 min per 10 s audio |
+| **Sieve / EMO** | Cloud | Best | N/A | Unbeatable realism | Proprietary / costly |
+
+> **Decision:** LivePortrait as the primary engine. Wav2Lip as CPU fallback if
+> CUDA is unavailable. SadTalker reserved for final high-polish renders on
+> request.
+
+#### 2. Slide Rendering — Reveal.js + Chrome Headless
+
+**Why Reveal.js?**
+* Native HTML—easy to generate from templates in Python.
+* Has a **print-to-PDF** mode and can be screenshot via `Playwright` or Puppeteer.
+* Supports automatic transition timing.
+* Can render code blocks, MathJax, images, and animations.
+
+**How to turn slides into video frames:**
+```bash
+# Option A: Capture each slide as an image, then stitch
+cd slides/
+npx playwright screenshot index.html slide_01.png --viewport-size=1920,1080
+# ... repeat per slide → feed to FFmpeg as image sequence
+
+# Option B: Single Reveal.js export script using Chrome DevTools Protocol
+python render_slides.py --output-dir frames/ --resolution 1920x1080
+```
+
+**Recommended slide layout** for video (to leave room for avatar):
+```css
+.reveal .slides section {
+  padding-right: 400px;   /* Leave right margin for avatar overlay */
+}
+```
+Or, for split-screen:
+```
+┌─────────────────┬────────┐
+│                 │        │
+│   Slide content │ Avatar │
+│   (left 70%)    │(right  │
+│                 │  30%)  │
+└─────────────────┴────────┘
+```
+
+#### 3. Composition Layout — FFmpeg Overlay
+
+**Proposed layout** (final video 1920×1080):
+
+| Layer | Position | Size |
+|-------|----------|------|
+| Slide background | Full canvas (z=0) | 1920×1080 |
+| Slide content | Left 70% (z=1) | 1344×1080, padded |
+| Avatar (LivePortrait output) | Bottom-right corner (z=2) | 576×768 (upscaled from 512×512) |
+| Audio track | Mixed in (z=audio) | 48 kHz stereo |
+| Watermark | Bottom-left (z=3) | "AI-generated avatar & voice" |
+
+**FFmpeg composition for one slide:**
+```bash
+ffmpeg -y \
+  -loop 1 -i "slide_01.png" \
+  -i "avatar_01.mp4" \
+  -i "slide_01.wav" \
+  -filter_complex "
+    [0:v]scale=1920:1080[bg];
+    [1:v]scale=576:-1,format=yuva420p,setpts=PTS-STARTPTS[ava];
+    [bg][ava]overlay=W-w-20:H-h-20[comp];
+    [comp]drawtext=text='AI-generated avatar & voice':
+      fontcolor=white@0.5:fontsize=18:x=20:y=H-th-20[final]
+  " \
+  -map "[final]" -map 2:a \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k \
+  -t "$DURATION" "slide_01_composed.mp4"
+```
+
+**Concatenation** for multi-slide video:
+```bash
+# Create concat list
+echo "file 'slide_01_composed.mp4'" > concat.txt
+echo "file 'slide_02_composed.mp4'" >> concat.txt
+
+# Concat with cross-fade
+ffmpeg -f concat -safe 0 -i concat.txt \
+  -c copy "final_presentation.mp4"
+```
+
+### File Structure
+
+```
+project03/
+├── assets/
+│   ├── avatars/
+│   │   └── avt_9b2c4d1e.jpg        # Cached from Image Agent (one-time intake)
+│   ├── audio/
+│   │   ├── slide_01.wav            # From Voice Agent per slide
+│   │   └── slide_02.wav
+│   ├── slides/
+│   │   ├── index.html              # Generated Reveal.js deck
+│   │   ├── slide_01.png            # Captured slide images
+│   │   └── slide_02.png
+│   └── deepfakes/
+│       ├── avatar_01.mp4           # LivePortrait output per slide
+│       └── avatar_02.mp4
+├── output/
+│   ├── slide_01_composed.mp4
+│   ├── slide_02_composed.mp4
+│   └── final_presentation.mp4      # Final output
+└── scripts/
+    ├── generate_slides.py          # Step 1: Reveal.js generation
+    ├── call_voice_api.py           # Step 2: Voice Agent client
+    ├── generate_deepfake.py        # Step 3: LivePortrait wrapper
+    └── compose_video.py            # Step 4: FFmpeg composition
+```
+
+### Timing Strategy
+
+Each slide needs its own audio duration. To sync the slide-to-avatar video:
+
+1. Generate audio → get exact duration `T` via `ffprobe` or `pydub`.
+2. Render slide as a still image that loops for `T` seconds.
+3. Run LivePortrait with audio length = `T` → avatar video also = `T`.
+4. Overlay both and output a clip of exactly `T` seconds.
+5. Concatenate all clips in order.
+
+### GPU/VRAM Budget Estimate
+
+| Operation | VRAM (est.) | Time (30 s audio) |
+|-----------|------------|-------------------|
+| LivePortrait inference (512×512) | 4–6 GB | 5–15 s |
+| LivePortrait inference (1024×1024) | 6–8 GB | 10–25 s |
+| FFmpeg composition (CPU) | 0 GB | 1–2 s per clip |
+| Slide capture (Playwright) | 0 GB | 1 s per slide |
+| **Total per slide** | **4–8 GB** | **<1 min typical** |
 
 ---
 
@@ -203,57 +722,55 @@ informatics**.
 
 ## Proposed Development Phases
 
-### Phase 1 — Concept and Requirements
+### Phase 1 — Concept and Requirements (Mostly Complete)
 
 **Goal:** Define clear framework conditions before technical work begins.
 
-- [ ] Define target video format (resolution, frame rate, length, target platform)
-- [ ] Identify external services and check their availability
-- [ ] Define input and output formats (what does the user enter, what comes out?)
+- [x] Define target video format: **MP4, 1920×1080, 30 fps, H.264, AAC audio**
+- [x] Identify external services: Image Agent (image provider), Voice Agent (TTS/cloning)
+- [x] Define input/output formats: topic string in → MP4 video out
 - [ ] Select one prototype topic from the list above
 - [ ] Check legal consent for avatar and voice usage
 
 **Result:** Requirements document, selected topic, confirmed service availability.
 
-### Phase 2 — Interface Planning
+### Phase 2 — Interface Planning (Complete)
 
 **Goal:** Define API contracts and data flows between Hermes, the voice server,
 and the avatar server.
 
-- [ ] Create API specification for voice server (request/response schema, auth, error codes)
-- [ ] Create API specification for avatar server
-- [ ] Decide file transfer method (upload URL, shared storage, Base64, etc.)
-- [ ] Document expected response formats (Audio: WAV/MP3? Video: MP4/WebM? Metadata?)
-- [ ] Define job-status polling schema (how often to poll? Which status codes?)
+- [x] Create API specification for voice server (request/response schema, auth, error codes) — documented in this file
+- [x] Create API specification for image server — documented in this file
+- [x] Decide file transfer method: **URL download + local cache**
+- [x] Document expected response formats (Audio: **WAV 24 kHz**; Video: **MP4 H.264**)
+- [x] Define job-status polling schema: exponential backoff, max 10 retries
 
-**Result:** API documentation, OpenAPI/Swagger spec (optional), test cases for each interface.
+**Result:** API documentation preserved in this doc. OpenAPI spec optional future work.
 
-### Phase 3 — Prototype Pipeline Design
+### Phase 3 — Tool Setup and Pipeline Scaffold
 
-**Goal:** Plan the complete flow from topic to raw video without calling the
-real servers.
+**Goal:** Install and configure the local deepfake and slide-rendering stack.
 
-- [ ] Plan slide generation: How does Hermes turn a topic into structured slides?
-- [ ] Plan narration generation: How are slides turned into a fluid speech script?
-- [ ] Plan synchronisation: How are slides, audio timing, and avatar video aligned?
-- [ ] Define fallback strategies: What happens if a server fails or is too slow?
+- [ ] Clone and install **LivePortrait** with PyTorch + CUDA
+- [ ] Test LivePortrait with a sample image + audio → verify output
+- [ ] Build **Reveal.js HTML slide generator** (Python template → HTML)
+- [ ] Build **slide-to-image capture** (Playwright or Chrome headless)
+- [ ] Scaffolding for `generate_slides.py`, `generate_deepfake.py`, `compose_video.py`
 
-**Result:** Architecture document, sequence diagram, error-handling concept.
+**Result:** Each script works in isolation; can be run manually end-to-end.
 
-### Phase 4 — Future Implementation
+### Phase 4 — Integration and End-to-End Test
 
-**Goal:** Implement the planned pipeline with real services.
+**Goal:** Wire all pieces together into a single orchestration flow.
 
-> **Note:** This phase requires completion of Phases 1–3 and the external
-> servers to be operational.
+- [ ] Implement mock Voice Agent (for offline testing) or connect real endpoint
+- [ ] Implement mock Image Agent (for offline testing) or connect real endpoint
+- [ ] Implement voice-service client (`call_voice_api.py`)
+- [ ] Implement avatar intake script (`intake_avatar.py`)
+- [ ] Implement full orchestrator: topic → slides → audio → deepfake → video
+- [ ] Test with real generated assets and evaluate quality/speed
 
-- [ ] Implement voice-server integration
-- [ ] Implement avatar-server integration
-- [ ] Implement video composition pipeline (slides + avatar + audio)
-- [ ] Test with real generated assets
-- [ ] Iterate and refine based on test results
-
-**Result:** Working prototype that produces a demo video for the topic selected in Phase 1.
+**Result:** Working prototype that produces a demo video for the selected topic.
 
 ---
 
