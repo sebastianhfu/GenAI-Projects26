@@ -84,9 +84,75 @@ User ──► Presentation Agent        │
 
 - **Image Agent service:** Connection protocol defined (REST v1), awaiting endpoint URL from other team
 - **Voice Agent service:** API contract defined (REST v1), awaiting endpoint URL from other team
-- **Local deepfake pipeline:** Tool selected (LivePortrait primary, Wav2Lip fallback); needs installation
-- **Reveal.js slide generator:** Method selected; needs template scaffolding
-- **FFmpeg composition script:** Pipeline design complete; implementation pending
+- ~~Local deepfake pipeline~~ **Installed** — LivePortrait running with placeholder avatar
+- ~~Reveal.js slide generator~~ **Implemented** — Headless Chromium renders HTML to PNG
+- ~~FFmpeg composition script~~ **Implemented** — Automated overlay + audio composition
+
+---
+
+## Placeholder Implementation (Current)
+
+A working end-to-end pipeline has been built using **placeholder assets** so development
+and testing can proceed independently of the external Image Agent and Voice Agent
+services.
+
+### Workspace Layout
+
+```
+/opt/data/project03-workspace/
+├── venvs/lp-env/               # Python 3.10 venv (LivePortrait + dependencies)
+├── LivePortrait/               # Cloned from KwaiVGI/LivePortrait
+│   └── pretrained_weights/     # Downloaded from HuggingFace
+├── assets/
+│   ├── avatars/placeholder_face.jpg   # Generic public-domain face (swap for Hahne)
+│   ├── audio/                  # Generated TTS audio (edge-tts)
+│   ├── slides/                 # HTML → PNG renders (1920×1080)
+│   └── output/                 # Final MP4 videos
+├── scripts/pipeline.py         # Automated 4-step pipeline
+└── docs/                       # Local API contracts & notes
+```
+
+### Pipeline Script (`pipeline.py`)
+
+Run from the activated virtual environment:
+
+```bash
+source /opt/data/project03-workspace/venvs/lp-env/bin/activate
+python /opt/data/project03-workspace/scripts/pipeline.py \
+  --topic "Neural Radiance Fields" \
+  --subtitle "Project 3 — GenAI Educational Media" \
+  --text "NeRF enables photorealistic 3D scene reconstruction..." \
+  --output /opt/data/project03-workspace/assets/output/video.mp4
+```
+
+### 4-Step Process
+
+| Step | Action | Tool | Output |
+|------|--------|------|--------|
+| 1 | **Render slide** to PNG | Headless Chromium (`chrome-headless-shell`) | `slide.png` (1920×1080) |
+| 2 | **Generate TTS audio** | `edge-tts` (Microsoft Edge voice, offline) | `audio.mp3` |
+| 3 | **Animate avatar** | LivePortrait (GPU-accelerated PyTorch) | `avatar.mp4` |
+| 4 | **Compose final video** | FFmpeg overlay + audio mux | `final.mp4` |
+
+### Placeholder → Real Swap Guide
+
+| Component | Current Placeholder | Real Replacement | How to Swap |
+|-----------|--------------------|-------------------|-------------|
+| **Avatar face** | Generic public-domain image (`placeholder_face.jpg`) | Prof. Hahne likeness from **Image Agent** | Replace `--face` path or call Image Agent intake endpoint, save to `avatars/` |
+| **Voice audio** | `edge-tts` (generic neural voice) | Cloned voice from **Voice Agent** `/speak` | Replace step 2 with `POST /api/v1/speak` request; use returned audio blob |
+| **Lip sync** | LivePortrait with pre-canned driving video motion | Audio-driven lip sync (Wav2Lip or LivePortrait v2) | Feed real voice audio as driving signal; use word-level timestamps to align slides |
+| **Slide content** | Static HTML template | Dynamic Reveal.js + generated content | Expand `SLIDE_TEMPLATE` to pull from topic generator or markdown source |
+
+### Known Limitations
+
+- **No real lip-sync yet:** Avatar motion comes from a pre-canned driving video, not
+the actual audio waveform. The mouth moves generically but does not match the TTS
+phonemes. Real lip-sync requires either Wav2Lip or an audio-driven LivePortrait mode.
+- **ONNX face detection falls back to CPU:** `libcudnn.so.8` is missing from the
+container, so the InsightFace detector runs on CPU. This adds ~0.1s latency per
+frame but does not affect output quality.
+- **Single-slide only:** The current script generates one slide. Multi-slide videos
+require extending the template loop and adding inter-slide transitions.
 
 ---
 
