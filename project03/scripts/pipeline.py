@@ -6,10 +6,13 @@ placeholder TTS voice, and slide background.
 
 Supports single-slide CLI mode and multi-slide presentation mode via JSON.
 
+Wav2Lip lip-sync is now integrated: the avatar's mouth movements
+are driven by the actual TTS audio waveform.
+
 When real APIs are available, swap:
   - VOICE_AGENT_URL → real Voice Agent /speak endpoint
   - AVATAR_IMAGE_PATH → real Prof. Hahne avatar from Image Agent
-  - LIP_SYNC_ENGINE → Wav2Lip or similar for audio-driven lips
+  - (Lip-sync engine stays as Wav2Lip — it works with any voice audio)
 
 Usage (single slide):
     python pipeline.py \
@@ -42,6 +45,8 @@ os.environ["LD_LIBRARY_PATH"] = f"{CUDNN8_COMPAT}:{CUDNN9_PKG}:{os.environ.get('
 # ─── Configuration ────────────────────────────────────────────────────────────
 CHROME_HEADLESS = "/opt/hermes/.playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell"
 LIVEPORTRAIT_DIR = "/opt/data/project03-workspace/LivePortrait"
+WAV2LIP_DIR = "/opt/data/project03-workspace/wav2lip"
+WAV2LIP_CHECKPOINT = "/opt/data/project03-workspace/wav2lip/checkpoints/Wav2Lip-SD-GAN.pt"
 PRETRAINED_WEIGHTS = "/opt/data/project03-workspace/LivePortrait/pretrained_weights"
 PLACEHOLDER_FACE = "/opt/data/project03-workspace/assets/avatars/placeholder_face.jpg"
 DRIVING_VIDEO = "/opt/data/project03-workspace/LivePortrait/assets/examples/driving/d0.mp4"
@@ -120,6 +125,20 @@ def animate_avatar(source_face, driving_video, out_dir):
     return str(animated)
 
 
+def lip_sync_avatar(face_video, audio_file, out_video, resize_factor=1):
+    """Run Wav2Lip to lip-sync the avatar video to the given audio."""
+    run([
+        sys.executable, "inference.py",
+        "--checkpoint_path", WAV2LIP_CHECKPOINT,
+        "--face", face_video,
+        "--audio", audio_file,
+        "--outfile", out_video,
+        "--resize_factor", str(resize_factor),
+    ], cwd=WAV2LIP_DIR)
+    print(f"[OK] Lip-synced avatar: {out_video}")
+    return out_video
+
+
 def get_duration(path):
     """Get media duration in seconds via ffprobe."""
     result = subprocess.run(
@@ -128,6 +147,21 @@ def get_duration(path):
         capture_output=True, text=True
     )
     return float(result.stdout.strip())
+
+
+def concat_audios(audio_files, out_wav):
+    """Concatenate multiple MP3 files into one WAV via ffmpeg."""
+    inputs = sum([["-i", f] for f in audio_files], [])
+    n = len(audio_files)
+    filter_str = "".join(f"[{i}:a]" for i in range(n)) + f"concat=n={n}:v=0:a=1[a]"
+    run([
+        "ffmpeg", "-y", *inputs,
+        "-filter_complex", filter_str,
+        "-map", "[a]",
+        "-ac", "1", "-ar", "22050",
+        out_wav
+    ])
+    return out_wav
 
 
 def compose_video(slide_pngs, avatar_mp4, audio_mp3s, output_mp4):
@@ -245,8 +279,12 @@ def build_single_slide(args):
     print("\n[3/4] Animating avatar with LivePortrait...")
     avatar_mp4 = animate_avatar(args.face, args.driving, avatar_out)
 
+    print("\n[3.5/4] Lip-syncing avatar with Wav2Lip...")
+    synced_avatar = audio_mp3.replace(".mp3", "_synced.mp4")
+    lip_sync_avatar(avatar_mp4, audio_mp3, synced_avatar)
+
     print("\n[4/4] Composing final video...")
-    compose_video([slide_png], avatar_mp4, [audio_mp3], args.output)
+    compose_video([slide_png], synced_avatar, [audio_mp3], args.output)
 
     # Save manifest
     manifest = {
@@ -258,7 +296,9 @@ def build_single_slide(args):
         "driving": args.driving,
         "duration": f"{get_duration(args.output):.1f}s",
         "timestamp": datetime.now().isoformat(),
-        "slides": [{"topic": args.topic, "text": args.text}]
+        "slides": [{"topic": args.topic, "text": args.text}],
+        "lip_sync": True,
+        "lip_sync_engine": "Wav2Lip"
     }
     save_manifest(args.output, manifest)
 
@@ -315,8 +355,15 @@ def build_presentation(args):
     driving = pres.get("driving", args.driving)
     avatar_mp4 = animate_avatar(face, driving, avatar_out)
 
+    print("\n[Lip-sync] Concatenating audio + running Wav2Lip...")
+    # Concatenate all MP3s into one WAV for Wav2Lip
+    concat_wav = os.path.join(tmp_dir, "concat_audio.wav")
+    concat_audios(audio_mp3s, concat_wav)
+    synced_avatar = os.path.join(tmp_dir, "avatar_lip_synced.mp4")
+    lip_sync_avatar(avatar_mp4, concat_wav, synced_avatar)
+
     print("\n[Composition] Building final video...")
-    compose_video(slide_pngs, avatar_mp4, audio_mp3s, args.output)
+    compose_video(slide_pngs, synced_avatar, audio_mp3s, args.output)
 
     # Save manifest
     manifest = {
@@ -327,7 +374,9 @@ def build_presentation(args):
         "driving": driving,
         "duration": f"{get_duration(args.output):.1f}s",
         "timestamp": datetime.now().isoformat(),
-        "slides": slides
+        "slides": slides,
+        "lip_sync": True,
+        "lip_sync_engine": "Wav2Lip"
     }
     save_manifest(args.output, manifest)
 

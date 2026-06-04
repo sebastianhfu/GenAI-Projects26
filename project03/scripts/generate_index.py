@@ -2,6 +2,7 @@
 """Auto-generate index.html + per-video detail pages for the gallery."""
 
 import argparse
+import datetime
 import glob
 import json
 import os
@@ -11,6 +12,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Project 3 — Generated Videos</title>
   <style>
     body {{
@@ -113,6 +117,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   {video_grid}
+
+  <!-- Generated: {timestamp} -->
 
   <div class="footer">
     Generated automatically by pipeline.py | Prof. Dr. Uwe Hahne @ Hochschule Furtwangen
@@ -353,7 +359,11 @@ def generate_index(root_dir):
             ))
         grid_html = f'<div class="video-grid">\n{"".join(cards)}\n</div>'
 
-    html = HTML_TEMPLATE.format(video_count=len(video_names), video_grid=grid_html)
+    html = HTML_TEMPLATE.format(
+        video_count=len(video_names),
+        video_grid=grid_html,
+        timestamp=datetime.datetime.now().isoformat()
+    )
 
     index_path = os.path.join(root_dir, "index.html")
     with open(index_path, "w", encoding="utf-8") as f:
