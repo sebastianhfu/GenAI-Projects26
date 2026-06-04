@@ -66,7 +66,11 @@ nav:
     - Übersicht: projects/index.md
     - Projekt 1: projects/project01.md
     - Projekt 2: projects/project02.md
-    - Projekt 3: projects/project03.md
+    - Projekt 3:
+      - Übersicht: projects/project03/index.md
+      - Log: projects/project03/log.md
+      - Audio API: projects/project03/audio_api.md
+      - Images: projects/project03/images.md
   - Dokumentation:
     - Übersicht: docs/index.md
     - Projekt 1: docs/project01.md
