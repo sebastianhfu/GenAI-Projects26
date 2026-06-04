@@ -1,0 +1,5 @@
+theme: jekyll-theme-cayman
+title: "Project 3 — GenAI Educational Media"
+description: "Automated pipeline for generating educational lecture videos with deepfake avatar + TTS narration. Hochschule Furtwangen — Prof. Dr. Uwe Hahne."
+show_downloads: false
+google_analytics:

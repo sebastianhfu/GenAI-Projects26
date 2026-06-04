@@ -48,13 +48,30 @@ huggingface-cli download KwaiVGI/LivePortrait \
 ## 5. Install Additional Tools
 
 ```bash
-# Placeholder TTS
 pip install edge-tts
 
 # Slide rendering (uses Hermes built-in chromium, or install playwright)
 pip install playwright
 playwright install chromium
 ```
+
+## 5b. Wav2Lip Installation (Lip-Sync)
+
+```bash
+git clone https://github.com/Rudrabha/Wav2Lip.git wav2lip
+pip install gdown
+
+cd wav2lip/checkpoints
+gdown --folder "https://drive.google.com/drive/folders/153HLrqlBNxzZcHi17PEvP09kkAfzRshM"
+mv checkpoints/* . && rmdir checkpoints 2>/dev/null || true
+```
+
+**Compatibility patches applied:**
+- `audio.py`: `librosa.filters.mel(sr=..., n_fft=...)` keyword args for librosa 0.11
+- `audio.py`: `librosa.load()` instead of deprecated `librosa.core.load()`
+- `audio.py`: `soundfile.write()` instead of removed `librosa.output.write_wav()`
+- `inference.py`: `torch.load(weights_only=False)` for PyTorch 2.7
+- `inference.py`: TorchScript archive fallback handling
 
 ## 6. cuDNN 8/9 GPU Compatibility Fix
 
@@ -116,10 +133,13 @@ Creates a Cloudflare Quick Tunnel with a random HTTPS URL.
 
 | File | Purpose |
 |------|---------|
+| `README.md` | Project overview and quick-start |
+| `SETUP.md` | This file — complete reproduction guide |
+| `docs/LOG.md` | Full build log — what was implemented and when |
+| `docs/AUDIO_API.md` | Voice Agent API contract — what API we need |
+| `docs/IMAGES.md` | Image/avatar API contract — what we need |
 | `scripts/pipeline.py` | Main pipeline: single slide or multi-slide presentation |
 | `scripts/generate_index.py` | Auto-generates HTML gallery + per-video detail pages |
 | `scripts/start_server.sh` | Starts HTTP server on port 8888 |
 | `scripts/start_tunnel.sh` | Starts Cloudflare tunnel for public access |
 | `presentations/nerf_presentation.json` | Example 5-slide presentation about Neural Radiance Fields |
-| `README.md` | Project overview and quick-start |
-| `SETUP.md` | This file — complete reproduction guide |
