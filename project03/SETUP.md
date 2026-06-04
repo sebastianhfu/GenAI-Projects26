@@ -56,15 +56,34 @@ pip install playwright
 playwright install chromium
 ```
 
-## 6. Verify Installation
+## 6. cuDNN 8/9 GPU Compatibility Fix
+
+If your container already has cuDNN 9.x for PyTorch but ONNX Runtime 1.18 needs cuDNN 8.x, follow this once:
 
 ```bash
-python -c "import torch, onnxruntime, cv2; print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available())"
+mkdir -p cudnn8_compat
+pip download --only-binary=:all: --no-deps "nvidia-cudnn-cu11==8.9.6.50" -d /tmp
+python -c "
+import zipfile, os
+whl='/tmp/nvidia_cudnn_cu11-8.9.6.50-py3-none-manylinux1_x86_64.whl'
+ex='/opt/data/project03-workspace/cudnn8_compat'
+zipfile.ZipFile(whl,'r').extractall(ex)
+"
+cp /opt/data/project03-workspace/cudnn8_compat/nvidia/cudnn/lib/*.so.8 \
+   /opt/data/project03-workspace/cudnn8_compat/
 ```
 
-Expected: `torch` shows `+cu118`, `torch.cuda.is_available()` returns `True`.
+`pipeline.py` already sets `LD_LIBRARY_PATH` automatically so both versions load correctly.
 
-## 7. Start the Gallery Server
+## 7. Verify GPU Acceleration
+
+```bash
+python -c "import torch, onnxruntime; print('PyTorch CUDA:', torch.cuda.is_available()); print('ORT providers:', onnxruntime.get_available_providers())"
+```
+
+Expected: `CUDA: True`, providers include `CUDAExecutionProvider`.
+
+## 8. Start the Gallery Server
 
 ```bash
 ./scripts/start_server.sh
@@ -72,7 +91,7 @@ Expected: `torch` shows `+cu118`, `torch.cuda.is_available()` returns `True`.
 
 Serves `assets/output/` on `http://localhost:8888/` with auto-generated video gallery.
 
-## 8. (Optional) Public Tunnel
+## 9. (Optional) Public Tunnel
 
 ```bash
 ./scripts/start_tunnel.sh
@@ -86,7 +105,7 @@ Creates a Cloudflare Quick Tunnel with a random HTTPS URL.
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| `libcudnn.so.8` not found | Missing cuDNN v8 for ONNXRuntime GPU | ONNX face detection falls back to CPU — output quality unaffected, just slower |
+| `libcudnn.so.8` not found | cuDNN 9.x installed but ONNX Runtime 1.18 needs 8.x | Follow **Step 6** (cuDNN 8/9 compatibility fix) in this guide |
 | `ModuleNotFoundError` for `PIL` | Pillow version mismatch | `pip install --force-reinstall pillow==10.4.0` |
 | Chrome headless not found | Playwright/Chromium not installed | Use `chrome-headless-shell` path from Hermes at `/opt/hermes/.playwright/...` |
 | Black output boxes | FP16 incompatible GPU | Set `flag_use_half_precision: false` in LivePortrait args |

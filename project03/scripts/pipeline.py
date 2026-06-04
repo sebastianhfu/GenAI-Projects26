@@ -25,7 +25,15 @@ import sys
 import tempfile
 from pathlib import Path
 
-# ─── Configuration ─────────────────────────────────────────────────────────
+# ─── cuDNN GPU Compatibility Fix ──────────────────────────────────────────────
+# This container has cuDNN 9.x (for PyTorch) but ONNX Runtime 1.18 needs cuDNN 8.x.
+# We keep both versions side-by-side and prepend LD_LIBRARY_PATH so ORT links correctly.
+CUDNN8_COMPAT = "/opt/data/project03-workspace/cudnn8_compat"
+CUDNN9_PKG = "/opt/data/project03-workspace/venvs/lp-env/lib/python3.10/site-packages/nvidia/cudnn/lib"
+
+os.environ["LD_LIBRARY_PATH"] = f"{CUDNN8_COMPAT}:{CUDNN9_PKG}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+
+# ─── Configuration ────────────────────────────────────────────────────────────
 CHROME_HEADLESS = "/opt/hermes/.playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell"
 LIVEPORTRAIT_DIR = "/opt/data/project03-workspace/LivePortrait"
 PRETRAINED_WEIGHTS = "/opt/data/project03-workspace/LivePortrait/pretrained_weights"
