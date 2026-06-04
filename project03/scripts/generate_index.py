@@ -318,6 +318,12 @@ def generate_index(root_dir):
     videos = sorted(glob.glob(os.path.join(root_dir, "*.mp4")))
     video_names = [os.path.basename(v) for v in videos]
 
+    # Filter: skip looped intermediates and videos without a manifest
+    video_names = [
+        name for name in video_names
+        if not name.endswith("_looped.mp4") and load_manifest(root_dir, name)
+    ]
+
     if not video_names:
         grid_html = '<p class="empty">No videos yet. Run pipeline.py to generate some.</p>'
     else:
@@ -326,23 +332,15 @@ def generate_index(root_dir):
             manifest = load_manifest(root_dir, name)
             detail_name = Path(name).stem
 
-            if manifest:
-                title = manifest.get("topic", detail_name)
-                subtitle = manifest.get("subtitle", "")
-                voice = manifest.get("voice", "en-US-AriaNeural").split("-")[-1]  # short name
-                slides = len(manifest.get("slides", []))
-                if slides == 0:
-                    slides = 1
-                duration = manifest.get("duration", "N/A")
-                timestamp = manifest.get("timestamp", "")
-                if timestamp:
-                    timestamp = timestamp.replace("T", " ").split(".")[0]
-            else:
-                title = detail_name
-                voice = "default"
+            title = manifest.get("topic", detail_name)
+            voice = manifest.get("voice", "en-US-AriaNeural").split("-")[-1]  # short name
+            slides = len(manifest.get("slides", []))
+            if slides == 0:
                 slides = 1
-                duration = "N/A"
-                timestamp = ""
+            duration = manifest.get("duration", "N/A")
+            timestamp = manifest.get("timestamp", "")
+            if timestamp:
+                timestamp = timestamp.replace("T", " ").split(".")[0]
 
             cards.append(VIDEO_CARD.format(
                 filename=name,
@@ -369,6 +367,12 @@ def generate_detail_pages(root_dir):
     """Generate per-video detail pages."""
     root_dir = os.path.abspath(root_dir)
     videos = sorted(glob.glob(os.path.join(root_dir, "*.mp4")))
+
+    # Same filtering for detail pages
+    videos = [
+        v for v in videos
+        if not os.path.basename(v).endswith("_looped.mp4")
+    ]
 
     detail_dir = Path(root_dir) / "detail"
     detail_dir.mkdir(exist_ok=True)
