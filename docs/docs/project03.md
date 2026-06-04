@@ -87,6 +87,7 @@ User ──► Presentation Agent        │
 - ~~Local deepfake pipeline~~ **Installed** — LivePortrait running with placeholder avatar
 - ~~Reveal.js slide generator~~ **Implemented** — Headless Chromium renders HTML to PNG
 - ~~FFmpeg composition script~~ **Implemented** — Automated overlay + audio composition
+- **Video gallery webserver** — Simple HTTP server on port 8888 with auto-generated index
 
 ---
 
@@ -153,6 +154,9 @@ container, so the InsightFace detector runs on CPU. This adds ~0.1s latency per
 frame but does not affect output quality.
 - **Single-slide only:** The current script generates one slide. Multi-slide videos
 require extending the template loop and adding inter-slide transitions.
+- **Gallery server:** A Python HTTP server (`python -m http.server 8888`) serves
+  the `assets/output/` directory with an auto-generated `index.html` that lists all
+  videos with inline players and download links.
 
 ---
 
