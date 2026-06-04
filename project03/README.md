@@ -9,11 +9,16 @@ This directory contains the working end-to-end pipeline for Project 3
 # Activate the Python 3.10 environment
 source venvs/lp-env/bin/activate
 
-# Generate a video
+# Single slide
 python scripts/pipeline.py \
   --topic "Your Topic Here" \
   --text "Narration script to synthesize and display." \
   --output assets/output/my_video.mp4
+
+# Multi-slide presentation (JSON file)
+python scripts/pipeline.py \
+  --presentation presentations/nerf_presentation.json \
+  --output assets/output/nerf_presentation.mp4
 ```
 
 ## Directory Overview
@@ -31,13 +36,14 @@ python scripts/pipeline.py \
 
 ## Placeholder Swap Checklist
 
+- [x] **Multi-slide:** Extend pipeline to accept slide decks via JSON (`--presentation` flag)
 - [ ] **Avatar:** Replace `assets/avatars/placeholder_face.jpg` with Prof. Hahne likeness from Image Agent
 - [ ] **Voice:** Replace `edge-tts` step in `pipeline.py` with Voice Agent `POST /speak`
 - [ ] **Lip-sync:** Switch from pre-canned driving video to audio-driven animation (Wav2Lip or audio-conditioned LivePortrait)
-- [ ] **Multi-slide:** Extend pipeline to accept slide decks instead of single topic/text
 
 ## Technical Notes
 
-- **GPU:** RTX A6000 (48 GB) — PyTorch models run on GPU; ONNX face detector falls back to CPU due to missing `libcudnn.so.8`
+- **GPU:** RTX A6000 (48 GB) — PyTorch + ONNX Runtime both run on GPU after cuDNN 8/9 compatibility fix
+- **Gallery:** Auto-generated `index.html` with per-video detail pages (`detail/{video}.html`) showing slides, voice, metadata
 - **Chromium:** Uses Hermes' built-in `chrome-headless-shell` for slide rendering
 - **Python:** 3.10.14 installed via `uv` (no sudo required)

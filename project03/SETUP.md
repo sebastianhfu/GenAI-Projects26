@@ -116,9 +116,10 @@ Creates a Cloudflare Quick Tunnel with a random HTTPS URL.
 
 | File | Purpose |
 |------|---------|
-| `scripts/pipeline.py` | Main pipeline: slide → TTS → avatar → composition |
-| `scripts/generate_index.py` | Auto-generates HTML gallery index |
+| `scripts/pipeline.py` | Main pipeline: single slide or multi-slide presentation |
+| `scripts/generate_index.py` | Auto-generates HTML gallery + per-video detail pages |
 | `scripts/start_server.sh` | Starts HTTP server on port 8888 |
 | `scripts/start_tunnel.sh` | Starts Cloudflare tunnel for public access |
+| `presentations/nerf_presentation.json` | Example 5-slide presentation about Neural Radiance Fields |
 | `README.md` | Project overview and quick-start |
 | `SETUP.md` | This file — complete reproduction guide |

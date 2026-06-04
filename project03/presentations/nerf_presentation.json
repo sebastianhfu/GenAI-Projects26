@@ -1,0 +1,39 @@
+{
+  "title": "Neural Radiance Fields (NeRF) — 3D Scene Reconstruction",
+  "subtitle": "Project 3 — GenAI Educational Media | Prof. Dr. Uwe Hahne",
+  "voice": "en-US-AriaNeural",
+  "face": "/opt/data/project03-workspace/assets/avatars/placeholder_face.jpg",
+  "driving": "/opt/data/project03-workspace/LivePortrait/assets/examples/driving/d0.mp4",
+  "slides": [
+    {
+      "topic": "What are Neural Radiance Fields?",
+      "subtitle": "Project 3 — GenAI Educational Media",
+      "text": "NeRF is a deep learning method that represents a 3D scene as a continuous volumetric function. It uses a fully connected neural network to map spatial coordinates and viewing directions to color and density values.",
+      "voice": "en-US-AriaNeural"
+    },
+    {
+      "topic": "How NeRF Works",
+      "subtitle": "Project 3 — GenAI Educational Media",
+      "text": "The model takes a 5D coordinate — 3D position plus 2D viewing direction — and outputs RGB color and volume density. This allows photorealistic rendering of novel views from any angle, given only a sparse set of input images.",
+      "voice": "en-US-AriaNeural"
+    },
+    {
+      "topic": "Volume Rendering & Ray Marching",
+      "subtitle": "Project 3 — GenAI Educational Media",
+      "text": "NeRF uses classical volume rendering to accumulate color along camera rays. The network predicts density at each point, enabling the model to learn where surfaces exist in the scene without explicit 3D supervision.",
+      "voice": "en-US-AriaNeural"
+    },
+    {
+      "topic": "Positional Encoding",
+      "subtitle": "Project 3 — GenAI Educational Media",
+      "text": "A key trick in NeRF is high-frequency positional encoding. The network receives sinusoidal embeddings of coordinates, allowing it to represent fine geometric and textural details that would be invisible to a standard MLP.",
+      "voice": "en-US-AriaNeural"
+    },
+    {
+      "topic": "Applications in AR & MR",
+      "subtitle": "Project 3 — GenAI Educational Media",
+      "text": "NeRF powers next-generation augmented and mixed reality. It enables real-time view synthesis, digital twin reconstruction, and immersive telepresence — research areas led by Prof. Dr. Uwe Hahne at Hochschule Furtwangen.",
+      "voice": "en-US-AriaNeural"
+    }
+  ]
+}
