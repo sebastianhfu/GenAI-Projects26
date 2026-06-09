@@ -1,6 +1,11 @@
 # GenAI-Projects26
 
-MkDocs-basierte Dokumentationsseite für die praktische Projektarbeit im Kurs **„KI in Medienanwendungen“** (Sommersemester 2026).
+MkDocs-basierte Dokumentationsseite für die praktische Projektarbeit im Kurs **„KI in Medienanwendungen“** (SoSe 2026).
+
+**Projekte:**
+- **Projekt 1** — Text-zu-Bild (Stable Diffusion)
+- **Projekt 2** — Bild-zu-Bild (Inpainting / Refinement)
+- **Projekt 3** — GenAI Educational Media (Talking-Head Avatar Pipeline) ← **Aktiv**
 
 ## Quickstart
 
@@ -13,7 +18,7 @@ mkdocs gh-deploy    # Auf GitHub Pages deployen
 
 ## Website
 
-- **Dokumentation:** https://kimbot26.github.io/GenAI-Projects26/
+- **Dokumentation:** https://sebastianhfu.github.io/GenAI-Projects26
 - **Hauptkursseite:** https://uhahne.github.io/GenAI/
 
 ## Lizenz

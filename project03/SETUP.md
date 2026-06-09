@@ -92,7 +92,129 @@ cp /opt/data/project03-workspace/cudnn8_compat/nvidia/cudnn/lib/*.so.8 \
 
 `pipeline.py` already sets `LD_LIBRARY_PATH` automatically so both versions load correctly.
 
-## 7. Verify GPU Acceleration
+## 7. Hallo2 Installation (Optional — Production Avatar)
+
+[Hallo2](https://github.com/fudan-generative-vision/Hallo2) is a diffusion-based audio-driven portrait animation model. It replaces the LivePortrait + Wav2Lip pipeline with a single native audio-to-avatar diffusion step, producing higher quality results with natural lip-sync.
+
+```bash
+# Clone Hallo2 (separate from project03 workspace)
+git clone https://github.com/fudan-generative-vision/Hallo2.git
+cd Hallo2
+
+# Create dedicated venv (Hallo2 uses torch cu121, different from LivePortrait)
+python3.10 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+# Requirements include: torch==2.2.2+cu121, xformers, diffusers, transformers, omegaconf
+
+# Download pretrained models (~2GB, ~40 files from HuggingFace)
+huggingface-cli download fudan-generative-ai/hallo2 \
+  --local-dir ./pretrained_models
+```
+
+### Hallo2 Configuration
+
+Create an inference YAML (e.g., `hallo_full.yaml`):
+
+```yaml
+source_image: /path/to/prof_hahne_v4_512.jpg
+driving_audio: /path/to/audio_16khz_mono.wav   # must be 16000 Hz, mono
+
+weight_dtype: fp16
+
+data:
+  n_motion_frames: 2
+  n_sample_frames: 16
+  source_image:
+    width: 512
+    height: 512
+  driving_audio:
+    sample_rate: 16000
+  export_video:
+    fps: 25
+
+inference_steps: 20    # 40 = highest quality; 20 = 2× faster, acceptable
+cfg_scale: 3.5
+
+use_mask: true
+mask_rate: 0.25
+use_cut: true
+
+audio_ckpt_dir: pretrained_models/hallo2
+save_path: /tmp/hallo2_output/
+
+base_model_path: ./pretrained_models/stable-diffusion-v1-5
+motion_module_path: ./pretrained_models/motion_module/mm_sd_v15_v2.ckpt
+
+face_analysis:
+  model_path: ./pretrained_models/face_analysis
+
+wav2vec:
+  model_path: ./pretrained_models/wav2vec/wav2vec2-base-960h
+  features: all
+
+audio_separator:
+  model_path: ./pretrained_models/audio_separator/Kim_Vocal_2.onnx
+
+vae:
+  model_path: ./pretrained_models/sd-vae-ft-mse
+
+face_expand_ratio: 1.2
+pose_weight: 1.0
+face_weight: 1.0
+lip_weight: 1.0
+
+unet_additional_kwargs:
+  use_inflated_groupnorm: true
+  use_motion_module: true
+  use_audio_module: true
+  motion_module_resolutions: [1, 2, 4, 8]
+  motion_module_mid_block: true
+  motion_module_type: Vanilla
+  motion_module_kwargs:
+    num_attention_heads: 8
+    num_transformer_block: 1
+    attention_block_types: ["Temporal_Self", "Temporal_Self"]
+    temporal_position_encoding: true
+    temporal_position_encoding_max_len: 32
+    temporal_attention_dim_div: 1
+  audio_attention_dim: 768
+  stack_enable_blocks_name: ["up", "down", "mid"]
+  stack_enable_blocks_depth: [0,1,2,3]
+
+enable_zero_snr: true
+noise_scheduler_kwargs:
+  beta_start: 0.00085
+  beta_end: 0.012
+  beta_schedule: "linear"
+  clip_sample: false
+  steps_offset: 1
+  prediction_type: "v_prediction"
+  rescale_betas_zero_snr: true
+  timestep_spacing: "trailing"
+
+sampler: DDIM
+```
+
+### Run Hallo2 Inference
+
+```bash
+# Long audio (>60s) uses chunked inference
+CUDA_VISIBLE_DEVICES=0 python scripts/inference_long.py --config ./hallo_full.yaml
+```
+
+**Output:** `merge_video.mp4` in `{save_path}/{image_stem}/merge_video.mp4`
+
+**Speed:**
+- 40 steps: ~42s per batch (~2.5–3h for 97s audio)
+- 20 steps: ~21s per batch (~50min for 97s audio)
+
+**VRAM:** ~9.7GB on RTX A6000
+
+---
+
+## 8. Verify GPU Acceleration
 
 ```bash
 python -c "import torch, onnxruntime; print('PyTorch CUDA:', torch.cuda.is_available()); print('ORT providers:', onnxruntime.get_available_providers())"
@@ -100,7 +222,7 @@ python -c "import torch, onnxruntime; print('PyTorch CUDA:', torch.cuda.is_avail
 
 Expected: `CUDA: True`, providers include `CUDAExecutionProvider`.
 
-## 8. Start the Gallery Server
+## 9. Start the Gallery Server
 
 ```bash
 ./scripts/start_server.sh
@@ -138,8 +260,9 @@ Creates a Cloudflare Quick Tunnel with a random HTTPS URL.
 | `docs/LOG.md` | Full build log — what was implemented and when |
 | `docs/AUDIO_API.md` | Voice Agent API contract — what API we need |
 | `docs/IMAGES.md` | Image/avatar API contract — what we need |
-| `scripts/pipeline.py` | Main pipeline: single slide or multi-slide presentation |
+| `scripts/pipeline.py` | Main pipeline: LivePortrait + Wav2Lip (legacy) |
+| `scripts/build_hallo2_presentation.py` | Hallo2 diffusion + slide composition (preferred) |
 | `scripts/generate_index.py` | Auto-generates HTML gallery + per-video detail pages |
 | `scripts/start_server.sh` | Starts HTTP server on port 8888 |
 | `scripts/start_tunnel.sh` | Starts Cloudflare tunnel for public access |
-| `presentations/nerf_presentation.json` | Example 5-slide presentation about Neural Radiance Fields |
+| `presentations/videoretalking_presentation.json` | Example 5-slide presentation about VideoReTalking |
