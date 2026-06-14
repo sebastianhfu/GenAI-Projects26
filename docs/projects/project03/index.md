@@ -6,6 +6,230 @@
 
 ---
 
+## Personal notes
+### Setup
+- Docker was used to host the hermes agent
+- As the agent needs GPU acceleration, specific packages for docker nvidia GPU suport had to be installed
+- Discord setup as a communication channel was somewhat annoying to deal with using this setup, especially to trust a given account
+
+### Findings
+- To modify the agent on the VM, the docker container has to be accessed
+- I did not find it that intuitive to modify settings via docker cli + hermes cli
+- The GitHub classic token to push and open PRs had to be entered over and over again, as it did not store it, probably due to security concerns
+- Simple tasks can starve and manual intervention has to be done to try again
+- Overall amount of given tokens using the ollama cloud plan was sufficient for the entire experiment
+- Majority of the project instructions were done using the discord channel
+
+### Project
+- The entire project was executed by the agent
+- Slight adjustments had to be made
+- The agent managed to download models, setup the pipeline, a http tunnel and coding scripts on its own
+- A few hallucinations happened during interacting with the agent, for example the required inference time on the given hardware
+
+Overall i was quite impressed by the capabilities of open source agents as it still managed to setup the entire project on its own.
+
+# VM Setup
+
+## Storage Configuration
+
+Create and mount the additional storage disk:
+
+```bash
+sudo fdisk /dev/sdb
+sudo mkfs.ext4 /dev/sdb1
+
+sudo mkdir -p /mnt/storage
+sudo mount /dev/sdb1 /mnt/storage
+sudo chown -R lecture:lecture /mnt/storage
+```
+
+Persist mount configuration:
+
+```bash
+sudo blkid /dev/sdb1
+sudo nano /etc/fstab
+sudo mount -a
+```
+
+Example entry:
+
+```text
+UUID=<UUID> /mnt/storage ext4 defaults,nofail 0 2
+```
+
+## SSH Configuration
+
+Enable OpenSSH and configure key-based authentication:
+
+```bash
+sudo mkdir -p /run/sshd
+sudo chmod 755 /run/sshd
+
+sudo systemctl start ssh
+sudo systemctl enable ssh
+```
+
+Generate an SSH key on the local machine:
+
+```bash
+ssh-keygen -t ed25519
+cat ~/.ssh/id_ed25519.pub
+```
+
+Add the public key to the VM:
+
+```bash
+nano ~/.ssh/authorized_keys
+
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+## Docker Installation
+
+Install Docker and required dependencies:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg git wget htop tmux unzip build-essential
+```
+
+Add the Docker repository and install Docker:
+
+```bash
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Enable Docker usage without sudo:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Verify installation:
+
+```bash
+docker run hello-world
+```
+
+## NVIDIA Container Toolkit
+
+Install and configure GPU support:
+
+```bash
+sudo apt install -y nvidia-container-toolkit
+
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Verify GPU passthrough:
+
+```bash
+docker run --rm --gpus all \
+  nvidia/cuda:12.4.1-runtime-ubuntu22.04 \
+  nvidia-smi
+```
+
+## Docker Data Migration
+
+Create a dedicated storage location:
+
+```bash
+sudo mkdir -p /mnt/storage/docker
+```
+
+Configure Docker:
+
+```bash
+sudo nano /etc/docker/daemon.json
+```
+
+```json
+{
+    "data-root": "/mnt/storage/docker",
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+}
+```
+
+Restart Docker:
+
+```bash
+sudo systemctl restart docker
+```
+
+Verify configuration:
+
+```bash
+docker info | grep "Docker Root Dir"
+```
+
+## Hermes Setup
+
+Create persistent storage:
+
+```bash
+mkdir -p /mnt/storage/hermes
+```
+
+Run initial setup:
+
+```bash
+docker run -it --rm \
+  --gpus all \
+  -v /mnt/storage/hermes:/opt/data \
+  nousresearch/hermes-agent setup
+```
+
+Configure environment variables:
+
+```bash
+nano /mnt/storage/hermes/.env
+```
+
+Example:
+
+```text
+OLLAMA_API_KEY=...
+DISCORD_ALLOWED_USERS=252538619787476993
+```
+
+## Hermes Gateway Deployment
+
+Configure the gateway:
+
+```bash
+docker run -it --rm \
+  --gpus all \
+  -v /mnt/storage/hermes:/opt/data \
+  nousresearch/hermes-agent setup gateway
+```
+
+Start the persistent container:
+
+```bash
+docker run -d \
+  --name hermes \
+  --restart unless-stopped \
+  --gpus all \
+  -v /mnt/storage/hermes:/opt/data \
+  -p 8642:8642 \
+  nousresearch/hermes-agent gateway run
+```
+
+Verify operation:
+
+```bash
+docker logs hermes
+docker ps
+```
+
 ## What is This?
 
 An automated pipeline that generates educational lecture videos with a **deepfake avatar of Prof. Dr. Uwe Hahne**, **TTS narration**, and **slide overlays**. Designed for GenAI research and the Industrial Metaverse at HFU.
